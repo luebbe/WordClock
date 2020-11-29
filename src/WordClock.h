@@ -11,33 +11,42 @@
 #include "LedMatrix.h"
 #include "TimeClient.h"
 
+// northen German convention uses quarter past/quarter to
+// southern/eastern German convention uses quarter/three quarters
+#define NORTHERN_GERMAN
+
 enum TWORDS
 {
-  _NULL_,
-  _EIN_,
-  _EINS_,
-  _ZWEI_,
-  _DREI_,
-  _VIER_,
-  _FUENF_,
-  _SECHS_,
-  _SIEBEN_,
-  _ACHT_,
-  _NEUN_,
-  _ZEHN_,
-  _ELF_,
-  _ZWOELF_,
-  _FUENF_M_,
-  _ZEHN_M_,
-  _ZWANZIG_M_,
-  _VIERTEL_M_,
-  _HALB_M_,
-  _DREIVIERTEL_M_,
-  _VOR_,
-  _NACH_,
-  _ES_,
-  _IST_,
-  _UHR_,
+   // Dummy
+  _NULL_, 
+  // Values for hours
+  _H_EIN_, 
+  _H_EINS_,
+  _H_ZWEI_,
+  _H_DREI_,
+  _H_VIER_,
+  _H_FUENF_,
+  _H_SECHS_,
+  _H_SIEBEN_,
+  _H_ACHT_,
+  _H_NEUN_,
+  _H_ZEHN_,
+  _H_ELF_,
+  _H_ZWOELF_,
+  // Values for minute distance towards the nearest (half) hour
+  _M_FUENF_, 
+  _M_ZEHN_,
+  _M_ZWANZIG_,
+  _M_VIERTEL_,
+  _M_HALB_,
+  _M_DREIVIERTEL_,
+  // Other words
+  _O_VOR_,
+  _O_NACH_,
+  _O_ES_,
+  _O_IST_,
+  _O_UHR_,
+  // Dummy
   _LAST_
 };
 

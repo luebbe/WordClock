@@ -40,116 +40,138 @@ void WordClock::updateHoursAndMinutes()
     currentHour = currentHour - 12;
 
   int j = 0;
-  currentWords[j++] = _ES_;
-  currentWords[j++] = _IST_;
+  currentWords[j++] = _O_ES_;
+  currentWords[j++] = _O_IST_;
 
   if (currentMinute >= 2 && currentMinute < 7)
   {
-    currentWords[j++] = _FUENF_;
-    currentWords[j++] = _NACH_;
+    currentWords[j++] = _M_FUENF_;
+    currentWords[j++] = _O_NACH_;
   }
-  if (currentMinute >= 7 && currentMinute < 12)
+  else if (currentMinute >= 7 && currentMinute < 12)
   {
-    currentWords[j++] = _ZEHN_;
-    currentWords[j++] = _NACH_;
+    currentWords[j++] = _M_ZEHN_;
+    currentWords[j++] = _O_NACH_;
   }
-  if (currentMinute >= 12 && currentMinute < 17)
+  else if (currentMinute >= 12 && currentMinute < 17)
   {
-    currentWords[j++] = _VIERTEL_M_;
-    currentWords[j++] = _NACH_;
+#ifdef NORTHERN_GERMAN
+    currentWords[j++] = _M_VIERTEL_;
+    currentWords[j++] = _O_NACH_;
+#else
+    currentWords[j++] = _M_VIERTEL_;
+#endif
   }
-  if (currentMinute >= 17 && currentMinute < 22)
+  else if (currentMinute >= 17 && currentMinute < 22)
   {
-    currentWords[j++] = _ZWANZIG_M_;
-    currentWords[j++] = _NACH_;
+    currentWords[j++] = _M_ZWANZIG_;
+    currentWords[j++] = _O_NACH_;
   }
-  if (currentMinute >= 22 && currentMinute < 27)
+  else if (currentMinute >= 22 && currentMinute < 27)
   {
-    currentWords[j++] = _FUENF_;
-    currentWords[j++] = _VOR_;
-    currentWords[j++] = _HALB_M_;
+    currentWords[j++] = _M_FUENF_;
+    currentWords[j++] = _O_VOR_;
+    currentWords[j++] = _M_HALB_;
     currentHour += 1;
   }
-  if (currentMinute >= 27 && currentMinute < 32)
+  else if (currentMinute >= 27 && currentMinute < 32)
   {
-    currentWords[j++] = _HALB_M_;
+    currentWords[j++] = _M_HALB_;
     currentHour += 1;
   }
-  if (currentMinute >= 32 && currentMinute < 37)
+  else if (currentMinute >= 32 && currentMinute < 37)
   {
-    currentWords[j++] = _FUENF_;
-    currentWords[j++] = _NACH_;
-    currentWords[j++] = _HALB_M_;
+    currentWords[j++] = _M_FUENF_;
+    currentWords[j++] = _O_NACH_;
+    currentWords[j++] = _M_HALB_;
     currentHour += 1;
   }
-  if (currentMinute >= 37 && currentMinute < 42)
+  else if (currentMinute >= 37 && currentMinute < 42)
   {
-    currentWords[j++] = _ZWANZIG_M_;
-    currentWords[j++] = _VOR_;
+    currentWords[j++] = _M_ZWANZIG_;
+    currentWords[j++] = _O_VOR_;
     currentHour += 1;
   }
-  if (currentMinute >= 42 && currentMinute < 47)
+  else if (currentMinute >= 42 && currentMinute < 47)
   {
-    currentWords[j++] = _VIERTEL_M_;
-    currentWords[j++] = _VOR_;
-  }
-  if (currentMinute >= 47 && currentMinute < 52)
-  {
-    currentWords[j++] = _ZEHN_M_;
-    currentWords[j++] = _VOR_;
+#ifdef NORTHERN_GERMAN
+    currentWords[j++] = _M_VIERTEL_;
+    currentWords[j++] = _O_VOR_;
+#else
+    currentWords[j++] = _M_DREIVIERTEL_;
+#endif
     currentHour += 1;
   }
-  if (currentMinute >= 52 && currentMinute < 57)
+  else if (currentMinute >= 47 && currentMinute < 52)
   {
-    currentWords[j++] = _FUENF_M_;
-    currentWords[j++] = _VOR_;
+    currentWords[j++] = _M_ZEHN_;
+    currentWords[j++] = _O_VOR_;
     currentHour += 1;
   }
-  if (currentMinute >= 57 && currentMinute <= 59)
+  else if (currentMinute >= 52 && currentMinute < 57)
+  {
+    currentWords[j++] = _M_FUENF_;
+    currentWords[j++] = _O_VOR_;
+    currentHour += 1;
+  }
+  else if (currentMinute >= 57 && currentMinute <= 59)
   {
     currentHour += 1;
+    currentWords[j++] = _O_UHR_;
+  }
+  else if (currentMinute >= 0 && currentMinute < 2)
+  {
+    currentWords[j++] = _O_UHR_;
   }
 
   switch (currentHour)
   {
   case 1:
-    currentWords[j++] = _EINS_;
+    // "Es ist ein Uhr", aber "es ist fünf nach eins".
+    if ((currentMinute >= 0 && currentMinute < 2) || (currentMinute >= 57 && currentMinute <= 59))
+    {
+      currentWords[j++] = _H_EIN_;
+    }
+    else
+    {
+      currentWords[j++] = _H_EINS_;
+    }
     break;
   case 2:
-    currentWords[j++] = _ZWEI_;
+    currentWords[j++] = _H_ZWEI_;
     break;
   case 3:
-    currentWords[j++] = _DREI_;
+    currentWords[j++] = _H_DREI_;
     break;
   case 4:
-    currentWords[j++] = _VIER_;
+    currentWords[j++] = _H_VIER_;
     break;
   case 5:
-    currentWords[j++] = _FUENF_;
+    currentWords[j++] = _H_FUENF_;
     break;
   case 6:
-    currentWords[j++] = _SECHS_;
+    currentWords[j++] = _H_SECHS_;
     break;
   case 7:
-    currentWords[j++] = _SIEBEN_;
+    currentWords[j++] = _H_SIEBEN_;
     break;
   case 8:
-    currentWords[j++] = _ACHT_;
+    currentWords[j++] = _H_ACHT_;
     break;
   case 9:
-    currentWords[j++] = _NEUN_;
+    currentWords[j++] = _H_NEUN_;
     break;
   case 10:
-    currentWords[j++] = _ZEHN_;
+    currentWords[j++] = _H_ZEHN_;
     break;
   case 11:
-    currentWords[j++] = _ELF_;
+    currentWords[j++] = _H_ELF_;
     break;
   case 12:
-    currentWords[j++] = _ZWOELF_;
+    currentWords[j++] = _H_ZWOELF_;
     break;
   default:
-    currentWords[j++] = _ZWOELF_;
+    currentWords[j++] = _H_ZWOELF_;
     break;
   }
 
