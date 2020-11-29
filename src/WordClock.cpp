@@ -95,13 +95,13 @@ void WordClock::updateHoursAndMinutes()
   }
   if (currentMinute >= 47 && currentMinute < 52)
   {
-    currentWords[j++] = _ZEHN_;
+    currentWords[j++] = _ZEHN_M_;
     currentWords[j++] = _VOR_;
     currentHour += 1;
   }
   if (currentMinute >= 52 && currentMinute < 57)
   {
-    currentWords[j++] = _FUENF_;
+    currentWords[j++] = _FUENF_M_;
     currentWords[j++] = _VOR_;
     currentHour += 1;
   }
