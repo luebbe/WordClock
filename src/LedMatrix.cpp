@@ -26,6 +26,13 @@ void LedMatrix::loop()
 
 void LedMatrix::setup()
 {
+  clearAll();
+}
+
+void LedMatrix::clearAll()
+{
+  memset(_leds, 0, sizeof(struct CRGB) * _width * _height);
+  FastLED.show();
 }
 
 // This function will return the right 'led index number' for

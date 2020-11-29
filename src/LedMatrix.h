@@ -59,6 +59,7 @@ protected:
   bool _vertical;
   uint8_t _brightness;
 
+  void clearAll();
   uint16_t XY(uint8_t x, uint8_t y);
   uint16_t XYsafe(uint8_t x, uint8_t y);
 
