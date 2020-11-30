@@ -11,16 +11,41 @@
 #include "LedMatrix.h"
 #include "TimeClient.h"
 
-// northen German convention uses quarter past/quarter to
-// southern/eastern German convention uses quarter/three quarters
+// LED matrix of 11x10 pixels with 0,0 at the bottom left
+// The matrix has to be the *first* section of the LED chain, because of the "safety pixel"
+#define MATRIX_WIDTH 11
+#define MATRIX_HEIGHT 10
+
+// Uncomment the following line if you have LEDs for the minutes *after* the matrix
+// #define HAS_MINUTES
+
+#ifdef HAS_MINUTES
+#define MINUTE_LEDS 4 // One LED in each corner for minutes 1..4
+#else
+#define MINUTE_LEDS 0 // No LEDs for the minutes
+#endif
+
+// Uncomment the following line if you have LEDs for the seconds *after* the LEDS for the minutes
+// #define HAS_SECONDS
+
+#ifdef HAS_SECONDS
+#define SECOND_LEDS 60
+#define SECOND_LEDS 30
+#else
+#define SECOND_LEDS 0
+#endif
+
+// Northen German convention uses "quarter past x"/"quarter to x+1" for x:15/x:45
+// Southern/eastern German convention uses "quarter x+1"/"three quarters x+1" for x:15/x:45
+// Uncomment the following line, if you want the southern German version
 #define NORTHERN_GERMAN
 
 enum TWORDS
 {
-   // Dummy
-  _NULL_, 
+  // Dummy
+  _NULL_,
   // Values for hours
-  _H_EIN_, 
+  _H_EIN_,
   _H_EINS_,
   _H_ZWEI_,
   _H_DREI_,
@@ -34,7 +59,7 @@ enum TWORDS
   _H_ELF_,
   _H_ZWOELF_,
   // Values for minute distance towards the nearest (half) hour
-  _M_FUENF_, 
+  _M_FUENF_,
   _M_ZEHN_,
   _M_ZWANZIG_,
   _M_VIERTEL_,
@@ -57,7 +82,7 @@ struct TWORDINFO
   uint8_t len;
 };
 
-// Word positions by led numbers.
+// Word positions by LED numbers.
 // This is for a matrix of 11x10 pixels with 0,0
 // at the bottom left.
 static const TWORDINFO TLEDS[] = {
