@@ -37,7 +37,7 @@ void TimeClient::updateTime() {
   WiFiClient client;
   const int httpPort = 80;
   if (!client.connect("google.com", httpPort)) {
-    Serial.println("connection failed");
+    Serial.println("TimeClient connection failed");
     return;
   }
 
@@ -48,7 +48,9 @@ void TimeClient::updateTime() {
   int repeatCounter = 0;
   while(!client.available() && repeatCounter < 10) {
     delay(1000);
+#ifdef DEBUG
     Serial.println(".");
+#endif
     repeatCounter++;
   }
 
@@ -61,14 +63,20 @@ void TimeClient::updateTime() {
       // example:
       // date: Thu, 19 Nov 2015 20:25:40 GMT
       if (line.startsWith("DATE: ")) {
+#ifdef DEBUG
         Serial.println(line.substring(23, 25) + ":" + line.substring(26, 28) + ":" + line.substring(29, 31));
+#endif
         int parsedHours = line.substring(23, 25).toInt();
         int parsedMinutes = line.substring(26, 28).toInt();
         int parsedSeconds = line.substring(29, 31).toInt();
+#ifdef DEBUG
         Serial.println(String(parsedHours) + ":" + String(parsedMinutes) + ":" + String(parsedSeconds));
+#endif
 
         localEpoc = (parsedHours * 60 * 60 + parsedMinutes * 60 + parsedSeconds);
+#ifdef DEBUG
         Serial.println(localEpoc);
+#endif
         localMillisAtUpdate = millis();
       }
     }

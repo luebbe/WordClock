@@ -17,6 +17,8 @@ RainbowAnimation::RainbowAnimation(CRGB *leds, uint8_t width, uint8_t height, bo
 
 void RainbowAnimation::loop()
 {
+  LedMatrix::loop();
+
   uint32_t ms = millis();
   int32_t yHueDelta32 = ((int32_t)cos16(ms * (27 / 1)) * (350 / _width));
   int32_t xHueDelta32 = ((int32_t)cos16(ms * (39 / 1)) * (310 / _height));
@@ -30,10 +32,6 @@ void RainbowAnimation::loop()
     FastLED.setBrightness(_brightness);
   }
   FastLED.show();
-}
-
-void RainbowAnimation::setup()
-{
 }
 
 void RainbowAnimation::DrawOneFrame(byte startHue8, int8_t yHueDelta8, int8_t xHueDelta8)

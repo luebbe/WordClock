@@ -26,6 +26,7 @@ void LedMatrix::loop()
 
 void LedMatrix::setup()
 {
+  FastLED.setBrightness(_brightness);
   clearAll();
 }
 

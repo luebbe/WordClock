@@ -26,6 +26,7 @@ See more at https://thingpulse.com
 
 #include <ESPWiFi.h>
 
+// #define DEBUG
 #define NTP_PACKET_SIZE 48
 
 class TimeClient {

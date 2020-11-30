@@ -22,5 +22,4 @@ public:
   explicit RainbowAnimation(CRGB *leds, uint8_t width, uint8_t height, bool sepentineLayout = true, bool vertical = false);
 
   virtual void loop() override;
-  virtual void setup() override;
 };
