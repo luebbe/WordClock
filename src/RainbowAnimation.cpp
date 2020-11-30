@@ -44,7 +44,7 @@ void RainbowAnimation::DrawOneFrame(byte startHue8, int8_t yHueDelta8, int8_t xH
     for (byte x = 0; x < _width; x++)
     {
       pixelHue += xHueDelta8;
-      _leds[XY(x, y)] = CHSV(pixelHue, 255, 255);
+      _matrixLEDs[XY(x, y)] = CHSV(pixelHue, 255, 255);
     }
   }
 }

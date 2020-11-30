@@ -13,7 +13,7 @@
 #include "LedMatrix.h"
 
 LedMatrix::LedMatrix(CRGB *leds, uint8_t width, uint8_t height, bool serpentineLayout, bool vertical)
-    : _leds(leds),
+    : _matrixLEDs(leds),
       _width(width), _height(height),
       _serpentineLayout(serpentineLayout),
       _vertical(vertical),
@@ -33,7 +33,7 @@ void LedMatrix::setup()
 
 void LedMatrix::clearAll()
 {
-  memset(_leds, 0, sizeof(struct CRGB) * _width * _height);
+  memset(_matrixLEDs, 0, sizeof(struct CRGB) * _width * _height);
   FastLED.show();
 }
 

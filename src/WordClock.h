@@ -11,13 +11,15 @@
 #include "LedMatrix.h"
 #include "TimeClient.h"
 
+#define DEBUG
+
 // LED matrix of 11x10 pixels with 0,0 at the bottom left
 // The matrix has to be the *first* section of the LED chain, because of the "safety pixel"
 #define MATRIX_WIDTH 11
 #define MATRIX_HEIGHT 10
 
 // Uncomment the following line if you have LEDs for the minutes *after* the matrix
-// #define HAS_MINUTES
+#define HAS_MINUTES
 
 #ifdef HAS_MINUTES
 #define MINUTE_LEDS 4 // One LED in each corner for minutes 1..4

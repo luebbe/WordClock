@@ -13,12 +13,18 @@ WordClock::WordClock(CRGB *leds, float utcOffset)
   _timeClient = new TimeClient(utcOffset);
   _lastWords.fill(0);
 
-  // CRGB *const minutes = (leds + width * height); // This is the position in the LED buffer, where the LEDs for the minutes are
+  //##DEBUG REMOVE
+  _minuteLEDs = (_matrixLEDs + 7); // last four LEDs in bottom row for debugging
+  // _minuteLEDs = (_matrixLEDs + _width * _height);  // Pointer to the start of the buffer for the minute LEDs
+  _secondLEDs = (_minuteLEDs + MINUTE_LEDS); // Pointer to the start of the buffer for the second LEDs
 }
 
 void WordClock::setup()
 {
   LedMatrix::setup();
+
+  //##DEBUG REMOVE
+  Serial.printf("%10d %10d %10d\r\n", _matrixLEDs, _minuteLEDs, _secondLEDs);
 
   _timeClient->updateTime();
 }
@@ -46,63 +52,66 @@ void WordClock::updateHoursAndMinutes()
   if (currentHour > 12)
     currentHour = currentHour - 12;
 
+  // if there are no minute LEDs, advance the clock by three minutes (2.5 minutes would be correct)
+  // so that the medium value "around" the displayed time matches better. 
+  // e.g. 16:57..17:02 are shown as "five o'clock"
+#ifndef HAS_MINUTES
+  currentMinute = (currentMinute + 3) % 60;
+#endif
+
   int j = 0;
   currentWords.fill(0);
 
   currentWords[j++] = _O_ES_;
   currentWords[j++] = _O_IST_;
 
-  if (currentMinute >= 2 && currentMinute < 7)
+  switch (currentMinute)
   {
+  case 0 ... 4:
+    currentWords[j++] = _O_UHR_;
+    break;
+  case 5 ... 9:
     currentWords[j++] = _M_FUENF_;
     currentWords[j++] = _O_NACH_;
-  }
-  else if (currentMinute >= 7 && currentMinute < 12)
-  {
+    break;
+  case 10 ... 14:
     currentWords[j++] = _M_ZEHN_;
     currentWords[j++] = _O_NACH_;
-  }
-  else if (currentMinute >= 12 && currentMinute < 17)
-  {
+    break;
+  case 15 ... 19:
 #ifdef NORTHERN_GERMAN
     currentWords[j++] = _M_VIERTEL_;
     currentWords[j++] = _O_NACH_;
 #else
     currentWords[j++] = _M_VIERTEL_;
 #endif
-  }
-  else if (currentMinute >= 17 && currentMinute < 22)
-  {
+    break;
+  case 20 ... 24:
     currentWords[j++] = _M_ZWANZIG_;
     currentWords[j++] = _O_NACH_;
-  }
-  else if (currentMinute >= 22 && currentMinute < 27)
-  {
+    break;
+  case 25 ... 29:
     currentWords[j++] = _M_FUENF_;
     currentWords[j++] = _O_VOR_;
     currentWords[j++] = _M_HALB_;
     currentHour += 1;
-  }
-  else if (currentMinute >= 27 && currentMinute < 32)
-  {
+    break;
+  case 30 ... 34:
     currentWords[j++] = _M_HALB_;
     currentHour += 1;
-  }
-  else if (currentMinute >= 32 && currentMinute < 37)
-  {
+    break;
+  case 35 ... 39:
     currentWords[j++] = _M_FUENF_;
     currentWords[j++] = _O_NACH_;
     currentWords[j++] = _M_HALB_;
     currentHour += 1;
-  }
-  else if (currentMinute >= 37 && currentMinute < 42)
-  {
+    break;
+  case 40 ... 44:
     currentWords[j++] = _M_ZWANZIG_;
     currentWords[j++] = _O_VOR_;
     currentHour += 1;
-  }
-  else if (currentMinute >= 42 && currentMinute < 47)
-  {
+    break;
+  case 45 ... 49:
 #ifdef NORTHERN_GERMAN
     currentWords[j++] = _M_VIERTEL_;
     currentWords[j++] = _O_VOR_;
@@ -110,27 +119,17 @@ void WordClock::updateHoursAndMinutes()
     currentWords[j++] = _M_DREIVIERTEL_;
 #endif
     currentHour += 1;
-  }
-  else if (currentMinute >= 47 && currentMinute < 52)
-  {
+    break;
+  case 50 ... 54:
     currentWords[j++] = _M_ZEHN_;
     currentWords[j++] = _O_VOR_;
     currentHour += 1;
-  }
-  else if (currentMinute >= 52 && currentMinute < 57)
-  {
+    break;
+  case 55 ... 59:
     currentWords[j++] = _M_FUENF_;
     currentWords[j++] = _O_VOR_;
     currentHour += 1;
-  }
-  else if (currentMinute >= 57 && currentMinute <= 59)
-  {
-    currentHour += 1;
-    currentWords[j++] = _O_UHR_;
-  }
-  else if (currentMinute >= 0 && currentMinute < 2)
-  {
-    currentWords[j++] = _O_UHR_;
+    break;
   }
 
   switch (currentHour)
@@ -213,6 +212,6 @@ void WordClock::sendWord(uint8_t index)
   CRGB actcolor = CRGB(randomRGB());
   for (int j = 0; j < TLEDS[index].len; j++)
   {
-    _leds[XY(TLEDS[index].x + j, TLEDS[index].y)] = actcolor;
+    _matrixLEDs[XY(TLEDS[index].x + j, TLEDS[index].y)] = actcolor;
   }
 }

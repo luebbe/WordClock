@@ -52,7 +52,7 @@
 class LedMatrix
 {
 protected:
-  CRGB *_leds;
+  CRGB *_matrixLEDs;
   uint8_t _width;
   uint8_t _height;
   bool _serpentineLayout;
