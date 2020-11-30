@@ -16,7 +16,8 @@ LedMatrix::LedMatrix(CRGB *leds, uint8_t width, uint8_t height, bool serpentineL
     : _leds(leds),
       _width(width), _height(height),
       _serpentineLayout(serpentineLayout),
-      _vertical(vertical)
+      _vertical(vertical),
+      _brightness(0)
 {
 }
 

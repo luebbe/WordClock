@@ -118,11 +118,16 @@ static const TWORDINFO TLEDS[] = {
 class WordClock : public LedMatrix
 {
 private:
+#define cMaxWords 10 // Should be enough ;)
+
   TimeClient *_timeClient;
+
+  CRGB *_minuteLEDs; // Pointer to the start of the buffer for the minute LEDs
+  CRGB *_secondLEDs; // Pointer to the start of the buffer for the second LEDs
 
   unsigned long _updateInterval;
   unsigned long _lastUpdate;
-  std::array<uint8_t, 10> _lastWords;
+  std::array<uint8_t, cMaxWords> _lastWords; // Buffer for the last words that have been sent to the matrix
 
   int randomRGB();
   void updateHoursAndMinutes();
@@ -131,7 +136,7 @@ private:
   void sendWord(uint8_t index);
 
 public:
-  explicit WordClock(CRGB *leds, uint8_t width, uint8_t height, bool sepentineLayout = true, bool vertical = false, float utcOffset = 0);
+  explicit WordClock(CRGB *leds, float utcOffset = 0);
 
   virtual void loop() override;
   virtual void setup() override;

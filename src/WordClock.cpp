@@ -7,39 +7,48 @@
 
 #include "WordClock.h"
 
-WordClock::WordClock(CRGB *leds, uint8_t width, uint8_t height, bool serpentineLayout, bool vertical, float utcOffset)
-    : LedMatrix(leds, width, height, serpentineLayout, vertical)
+WordClock::WordClock(CRGB *leds, float utcOffset)
+    : LedMatrix(leds, MATRIX_WIDTH, MATRIX_HEIGHT), _updateInterval(1), _lastUpdate(0)
 {
   _timeClient = new TimeClient(utcOffset);
+  _lastWords.fill(0);
+
+  // CRGB *const minutes = (leds + width * height); // This is the position in the LED buffer, where the LEDs for the minutes are
 }
 
 void WordClock::setup()
 {
-  FastLED.setBrightness(_brightness);
+  LedMatrix::setup();
+
   _timeClient->updateTime();
-  clearAll();
 }
 
 void WordClock::loop()
 {
+  LedMatrix::loop();
+
   if ((millis() - _lastUpdate >= _updateInterval * 1000UL) || (_lastUpdate == 0))
   {
     _timeClient->updateTime();
     updateHoursAndMinutes();
+    updateSeconds();
     FastLED.show();
   }
 }
 
 void WordClock::updateHoursAndMinutes()
 {
-  std::array<uint8_t, 10> currentWords;
+  std::array<uint8_t, cMaxWords> currentWords;
   int currentHour = _timeClient->getHours().toInt();
   int currentMinute = _timeClient->getMinutes().toInt();
+  int currentSecond = _timeClient->getSeconds().toInt();
 
   if (currentHour > 12)
     currentHour = currentHour - 12;
 
   int j = 0;
+  currentWords.fill(0);
+
   currentWords[j++] = _O_ES_;
   currentWords[j++] = _O_IST_;
 
@@ -177,10 +186,14 @@ void WordClock::updateHoursAndMinutes()
 
   if (_lastWords != currentWords)
   {
-    Serial.printf("Sending %d words", j);
+    Serial.printf("%s Sending %d words:", _timeClient->getFormattedTime().c_str(), j);
     clearAll();
-    for (int i = 0; i <= j; i++)
+    for (int i = 0; i < j; i++)
+    {
+      Serial.printf(" %d", currentWords[i]);
       sendWord(currentWords[i]);
+    }
+    Serial.printf("\r\n");
     _lastWords = currentWords;
   }
 }
