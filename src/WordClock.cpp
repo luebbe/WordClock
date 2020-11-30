@@ -52,16 +52,34 @@ void WordClock::updateHoursAndMinutes()
   if (currentHour > 12)
     currentHour = currentHour - 12;
 
+#ifdef HAS_MINUTES
+  int8_t minute = (currentMinute % 5) - 1;
+  static CRGB minuteColor = CRGB(0xFF);
+  if (minute == -1)
+  {
+    // Erase buffer in minute 0 of 5 and pick a color for all minute LEDs
+    memset(_minuteLEDs, 0, sizeof(struct CRGB) * MINUTE_LEDS);
+    minuteColor = randomRGB();
+  }
+  else
+  {
+    // Set the color for all minutes up to the current minute
+    for (int i = 0; i <= minute; i++)
+    {
+      _minuteLEDs[i] = minuteColor;
+    }
+  }
+#else
   // if there are no minute LEDs, advance the clock by three minutes (2.5 minutes would be correct)
-  // so that the medium value "around" the displayed time matches better. 
+  // so that the current time is "centered" around the displayed time.
   // e.g. 16:57..17:02 are shown as "five o'clock"
-#ifndef HAS_MINUTES
   currentMinute = (currentMinute + 3) % 60;
 #endif
 
   int j = 0;
   currentWords.fill(0);
 
+  // The order of the word indexes in the array is not the order of the words on the display.
   currentWords[j++] = _O_ES_;
   currentWords[j++] = _O_IST_;
 
@@ -202,14 +220,15 @@ void WordClock::updateSeconds()
   int seconds = _timeClient->getSeconds().toInt();
 }
 
-int WordClock::randomRGB()
+CRGB WordClock::randomRGB()
 {
-  return random(0, 0xFFFFFF);
+  // If we're unlucky, we'll get an almost invisible colour
+  return CRGB(random(1, 0xFFFFFF));
 }
 
 void WordClock::sendWord(uint8_t index)
 {
-  CRGB actcolor = CRGB(randomRGB());
+  CRGB actcolor = randomRGB();
   for (int j = 0; j < TLEDS[index].len; j++)
   {
     _matrixLEDs[XY(TLEDS[index].x + j, TLEDS[index].y)] = actcolor;

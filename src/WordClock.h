@@ -131,7 +131,7 @@ private:
   unsigned long _lastUpdate;
   std::array<uint8_t, cMaxWords> _lastWords; // Buffer for the last words that have been sent to the matrix
 
-  int randomRGB();
+  CRGB randomRGB();
   void updateHoursAndMinutes();
   void updateSeconds();
 
