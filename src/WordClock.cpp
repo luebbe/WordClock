@@ -7,10 +7,12 @@
 
 #include "WordClock.h"
 
-WordClock::WordClock(CRGB *leds, float utcOffset)
-    : LedMatrix(leds, MATRIX_WIDTH, MATRIX_HEIGHT), _updateInterval(1), _lastUpdate(0)
+WordClock::WordClock(CRGB *leds, TimeClient *timeClient)
+    : LedMatrix(leds, MATRIX_WIDTH, MATRIX_HEIGHT),
+      _timeClient(timeClient),
+      _updateInterval(1),
+      _lastUpdate(0)
 {
-  _timeClient = new TimeClient(utcOffset);
   _lastWords.fill(0);
 
   //##DEBUG REMOVE
@@ -47,7 +49,6 @@ void WordClock::updateHoursAndMinutes()
   std::array<uint8_t, cMaxWords> currentWords;
   int currentHour = _timeClient->getHours().toInt();
   int currentMinute = _timeClient->getMinutes().toInt();
-  int currentSecond = _timeClient->getSeconds().toInt();
 
   if (currentHour > 12)
     currentHour = currentHour - 12;
@@ -70,10 +71,14 @@ void WordClock::updateHoursAndMinutes()
     }
   }
 #else
-  // if there are no minute LEDs, advance the clock by three minutes (2.5 minutes would be correct)
+  // if there are no minute LEDs, advance the clock by 2.5 minutes.
   // so that the current time is "centered" around the displayed time.
-  // e.g. 16:57..17:02 are shown as "five o'clock"
-  currentMinute = (currentMinute + 3) % 60;
+  // e.g. 16:57:30..17:02:29 are shown as "five o'clock"
+  int currentSecond = _timeClient->getSeconds().toInt();
+  currentMinute = (currentMinute + (currentSecond < 30 ? 2 : 3)) % 60;
+#ifdef DEBUG
+  Serial.printf("%s Adjusted minute %d\r\n", _timeClient->getFormattedTime().c_str(), currentMinute);
+#endif
 #endif
 
   int j = 0;

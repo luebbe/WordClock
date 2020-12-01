@@ -19,7 +19,7 @@
 #define MATRIX_HEIGHT 10
 
 // Uncomment the following line if you have LEDs for the minutes *after* the matrix
-#define HAS_MINUTES
+// #define HAS_MINUTES
 
 #ifdef HAS_MINUTES
 #define MINUTE_LEDS 4 // One LED in each corner for minutes 1..4
@@ -138,7 +138,7 @@ private:
   void sendWord(uint8_t index);
 
 public:
-  explicit WordClock(CRGB *leds, float utcOffset = 0);
+  explicit WordClock(CRGB *leds, TimeClient *timeClient);
 
   virtual void loop() override;
   virtual void setup() override;

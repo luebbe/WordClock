@@ -1,6 +1,7 @@
 #include <FastLED.h>
 // #include "RainbowAnimation.h"
 #include "WordClock.h"
+
 #include "secrets.h"
 
 #define LED_PIN 5 // D1 on D1 Mini
@@ -11,6 +12,8 @@
 #define BRIGHTNESS 5
 const float UTC_OFFSET = 1;
 
+TimeClient timeClient(UTC_OFFSET);
+
 // Params for width, height and number of extra LEDs are defined in WordClock.h
 
 #define NUM_LEDS (MATRIX_WIDTH * MATRIX_HEIGHT) + MINUTE_LEDS + SECOND_LEDS
@@ -18,7 +21,7 @@ CRGB leds_plus_safety_pixel[NUM_LEDS + 1];                // The first pixel in 
 CRGB *const leds(leds_plus_safety_pixel + 1);             // This is the "off-by-one" array that we actually work with and which is passed to FastLED!
 
 // RainbowAnimation rainbowAnimation(leds, MATRIX_WIDTH, MATRIX_HEIGHT);
-WordClock wordClock(leds, UTC_OFFSET);
+WordClock wordClock(leds, &timeClient);
 
 void setup()
 {
