@@ -37,11 +37,6 @@
 #define SECOND_LEDS 0
 #endif
 
-// Northen German convention uses "quarter past x"/"quarter to x+1" for x:15/x:45
-// Southern/eastern German convention uses "quarter x+1"/"three quarters x+1" for x:15/x:45
-// Uncomment the following line, if you want the southern German version
-#define NORTHERN_GERMAN
-
 enum TWORDS
 {
   // Dummy
@@ -73,6 +68,9 @@ enum TWORDS
   _O_ES_,
   _O_IST_,
   _O_UHR_,
+  _X_DREI_,
+  _X_VIER_,
+  _X_VIERTEL_,
   // Dummy
   _LAST_
 };
@@ -90,30 +88,33 @@ struct TWORDINFO
 static const TWORDINFO TLEDS[] = {
     // x, y, length
     {0, 0, 0},  // NULL
-    {2, 4, 3},  // EIN
-    {2, 4, 4},  // EINS
-    {0, 4, 4},  // ZWEI
-    {1, 3, 4},  // DREI
-    {7, 2, 4},  // VIER
-    {7, 3, 4},  // FÜNF
-    {1, 0, 5},  // SECHS
-    {5, 4, 6},  // SIEBEN
-    {1, 1, 4},  // ACHT
-    {3, 2, 4},  // NEUN
-    {5, 1, 4},  // ZEHN
-    {0, 2, 3},  // ELF
-    {5, 5, 5},  // ZWÖLF
-    {7, 9, 4},  // FÜNF Minuten
-    {0, 8, 4},  // ZEHN Minuten
-    {4, 8, 7},  // ZWANZIG Minuten
-    {4, 7, 7},  // VIERTEL
-    {0, 5, 4},  // HALB
-    {0, 7, 11}, // DREIVIERTEL
-    {6, 6, 3},  // VOR
-    {2, 6, 4},  // NACH
-    {0, 9, 2},  // ES
-    {3, 9, 3},  // IST
-    {8, 0, 3},  // UHR
+    {2, 4, 3},  // _H_EIN
+    {2, 4, 4},  // _H_EINS
+    {0, 4, 4},  // _H_ZWEI
+    {1, 3, 4},  // _H_DREI
+    {7, 2, 4},  // _H_VIER
+    {7, 3, 4},  // _H_FÜNF
+    {1, 0, 5},  // _H_SECHS
+    {5, 4, 6},  // _H_SIEBEN
+    {1, 1, 4},  // _H_ACHT
+    {3, 2, 4},  // _H_NEUN
+    {5, 1, 4},  // _H_ZEHN
+    {0, 2, 3},  // _H_ELF
+    {5, 5, 5},  // _H_ZWÖLF
+    {7, 9, 4},  // _M_FÜNF Minuten
+    {0, 8, 4},  // _M_ZEHN Minuten
+    {4, 8, 7},  // _M_ZWANZIG Minuten
+    {4, 7, 7},  // _M_VIERTEL
+    {0, 5, 4},  // _M_HALB
+    {0, 7, 11}, // _M_DREIVIERTEL
+    {6, 6, 3},  // _O_VOR
+    {2, 6, 4},  // _O_NACH
+    {0, 9, 2},  // _O_ES
+    {3, 9, 3},  // _O_IST
+    {8, 0, 3},  // _O_UHR
+    {0, 7, 4},  // _X_DREI_
+    {5, 7, 4},  // _X_VIER_
+    {5, 7, 7},  // _X_VIERTEL_
     {0, 0, 0}   // LAST
 };
 
@@ -130,6 +131,7 @@ private:
   unsigned long _updateInterval;
   unsigned long _lastUpdate;
   std::array<uint8_t, cMaxWords> _lastWords; // Buffer for the last words that have been sent to the matrix
+  bool _useThreeQuarters;                    // Use "quarter to"/"quarter past" or "quarter"/"three quarters" depending on region
 
   CRGB randomRGB();
   void updateHoursAndMinutes();
@@ -142,4 +144,6 @@ public:
 
   virtual void loop() override;
   virtual void setup() override;
+
+  void setUseThreeQuarters(bool value) { _useThreeQuarters = value; }
 };

@@ -11,7 +11,8 @@ WordClock::WordClock(CRGB *leds, TimeClient *timeClient)
     : LedMatrix(leds, MATRIX_WIDTH, MATRIX_HEIGHT),
       _timeClient(timeClient),
       _updateInterval(1),
-      _lastUpdate(0)
+      _lastUpdate(0),
+      _useThreeQuarters(false)
 {
   _lastWords.fill(0);
 
@@ -76,9 +77,6 @@ void WordClock::updateHoursAndMinutes()
   // e.g. 16:57:30..17:02:29 are shown as "five o'clock"
   int currentSecond = _timeClient->getSeconds().toInt();
   currentMinute = (currentMinute + (currentSecond < 30 ? 2 : 3)) % 60;
-#ifdef DEBUG
-  Serial.printf("%s Adjusted minute %d\r\n", _timeClient->getFormattedTime().c_str(), currentMinute);
-#endif
 #endif
 
   int j = 0;
@@ -102,12 +100,17 @@ void WordClock::updateHoursAndMinutes()
     currentWords[j++] = _O_NACH_;
     break;
   case 15 ... 19:
-#ifdef NORTHERN_GERMAN
-    currentWords[j++] = _M_VIERTEL_;
-    currentWords[j++] = _O_NACH_;
-#else
-    currentWords[j++] = _M_VIERTEL_;
-#endif
+    if (_useThreeQuarters)
+    {
+      // Use "quarter x+1" for hh:15
+      currentWords[j++] = _M_VIERTEL_;
+    }
+    else
+    {
+      // Use "quarter past x" for hh:15
+      currentWords[j++] = _M_VIERTEL_;
+      currentWords[j++] = _O_NACH_;
+    }
     break;
   case 20 ... 24:
     currentWords[j++] = _M_ZWANZIG_;
@@ -135,12 +138,17 @@ void WordClock::updateHoursAndMinutes()
     currentHour += 1;
     break;
   case 45 ... 49:
-#ifdef NORTHERN_GERMAN
-    currentWords[j++] = _M_VIERTEL_;
-    currentWords[j++] = _O_VOR_;
-#else
-    currentWords[j++] = _M_DREIVIERTEL_;
-#endif
+    if (_useThreeQuarters)
+    {
+      // Use "three quarters x+1" for hh:45
+      currentWords[j++] = _M_DREIVIERTEL_;
+    }
+    else
+    {
+      // Use "quarter to x+1" for hh:45
+      currentWords[j++] = _M_VIERTEL_;
+      currentWords[j++] = _O_VOR_;
+    }
     currentHour += 1;
     break;
   case 50 ... 54:
