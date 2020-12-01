@@ -42,6 +42,7 @@ void WordClock::loop()
     updateHoursAndMinutes();
     updateSeconds();
     FastLED.show();
+    _lastUpdate = millis();
   }
 }
 
