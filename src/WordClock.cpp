@@ -14,7 +14,7 @@ WordClock::WordClock(CRGB *leds, TimeClient *timeClient)
       _lastUpdate(0),
       _useThreeQuarters(false)
 {
-  _lastWords.fill(0);
+  _lastWords.clear();
 
   //##DEBUG REMOVE
   _minuteLEDs = (_matrixLEDs + 7); // last four LEDs in bottom row for debugging
@@ -27,7 +27,7 @@ void WordClock::setup()
   LedMatrix::setup();
 
   //##DEBUG REMOVE
-  Serial.printf("%10d %10d %10d\r\n", _matrixLEDs, _minuteLEDs, _secondLEDs);
+  Serial.printf("%10d %10d %10d\r\n", int(_matrixLEDs), int(_minuteLEDs), int(_secondLEDs));
 
   _timeClient->updateTime();
 }
@@ -45,120 +45,106 @@ void WordClock::loop()
   }
 }
 
-void WordClock::updateHoursAndMinutes()
+void WordClock::adjustTime(int &hour, int &minute, int &second)
 {
-  std::array<uint8_t, cMaxWords> currentWords;
-  int currentHour = _timeClient->getHours().toInt();
-  int currentMinute = _timeClient->getMinutes().toInt();
+  if (hour > 12)
+    hour = hour - 12;
 
-  if (currentHour > 12)
-    currentHour = currentHour - 12;
-
-#ifdef HAS_MINUTES
-  int8_t minute = (currentMinute % 5) - 1;
-  static CRGB minuteColor = CRGB(0xFF);
-  if (minute == -1)
+// When there are no minute LEDs, advance the clock by 2.5 minutes.
+// so that the current time is "centered" around the displayed time.
+// e.g. 16:57:30..17:02:29 are shown as "five o'clock"
+#ifndef HAS_MINUTES
+  int minuteOffset = (_timeClient->getSeconds().toInt() < 30 ? 2 : 3);
+  // Check whether the offset pushes us into the next hour
+  if (minute + minuteOffset >= 60)
   {
-    // Erase buffer in minute 0 of 5 and pick a color for all minute LEDs
-    memset(_minuteLEDs, 0, sizeof(struct CRGB) * MINUTE_LEDS);
-    minuteColor = randomRGB();
+    hour++;
   }
-  else
-  {
-    // Set the color for all minutes up to the current minute
-    for (int i = 0; i <= minute; i++)
-    {
-      _minuteLEDs[i] = minuteColor;
-    }
-  }
-#else
-  // if there are no minute LEDs, advance the clock by 2.5 minutes.
-  // so that the current time is "centered" around the displayed time.
-  // e.g. 16:57:30..17:02:29 are shown as "five o'clock"
-  int currentSecond = _timeClient->getSeconds().toInt();
-  currentMinute = (currentMinute + (currentSecond < 30 ? 2 : 3)) % 60;
+  minute = (minute + minuteOffset) % 60;
 #endif
+}
 
-  int j = 0;
-  currentWords.fill(0);
-
+void WordClock::createWords(TWORDBUF &currentWords, int &currentHour, int &currentMinute)
+{
   // The order of the word indexes in the array is not the order of the words on the display.
-  currentWords[j++] = _O_ES_;
-  currentWords[j++] = _O_IST_;
+  currentWords.clear();
+  currentWords.push_back(_O_ES_);
+  currentWords.push_back(_O_IST_);
 
   switch (currentMinute)
   {
   case 0 ... 4:
-    currentWords[j++] = _O_UHR_;
+    // This places "o'clock" before the hour in the output array, but it's only visible in the debug output.
+    currentWords.push_back(_O_UHR_);
     break;
   case 5 ... 9:
-    currentWords[j++] = _M_FUENF_;
-    currentWords[j++] = _O_NACH_;
+    currentWords.push_back(_M_FUENF_);
+    currentWords.push_back(_O_NACH_);
     break;
   case 10 ... 14:
-    currentWords[j++] = _M_ZEHN_;
-    currentWords[j++] = _O_NACH_;
+    currentWords.push_back(_M_ZEHN_);
+    currentWords.push_back(_O_NACH_);
     break;
   case 15 ... 19:
     if (_useThreeQuarters)
     {
       // Use "quarter x+1" for hh:15
-      currentWords[j++] = _M_VIERTEL_;
+      currentWords.push_back(_M_VIERTEL_);
     }
     else
     {
       // Use "quarter past x" for hh:15
-      currentWords[j++] = _M_VIERTEL_;
-      currentWords[j++] = _O_NACH_;
+      currentWords.push_back(_M_VIERTEL_);
+      currentWords.push_back(_O_NACH_);
     }
     break;
   case 20 ... 24:
-    currentWords[j++] = _M_ZWANZIG_;
-    currentWords[j++] = _O_NACH_;
+    currentWords.push_back(_M_ZWANZIG_);
+    currentWords.push_back(_O_NACH_);
     break;
   case 25 ... 29:
-    currentWords[j++] = _M_FUENF_;
-    currentWords[j++] = _O_VOR_;
-    currentWords[j++] = _M_HALB_;
+    currentWords.push_back(_M_FUENF_);
+    currentWords.push_back(_O_VOR_);
+    currentWords.push_back(_M_HALB_);
     currentHour += 1;
     break;
   case 30 ... 34:
-    currentWords[j++] = _M_HALB_;
+    currentWords.push_back(_M_HALB_);
     currentHour += 1;
     break;
   case 35 ... 39:
-    currentWords[j++] = _M_FUENF_;
-    currentWords[j++] = _O_NACH_;
-    currentWords[j++] = _M_HALB_;
+    currentWords.push_back(_M_FUENF_);
+    currentWords.push_back(_O_NACH_);
+    currentWords.push_back(_M_HALB_);
     currentHour += 1;
     break;
   case 40 ... 44:
-    currentWords[j++] = _M_ZWANZIG_;
-    currentWords[j++] = _O_VOR_;
+    currentWords.push_back(_M_ZWANZIG_);
+    currentWords.push_back(_O_VOR_);
     currentHour += 1;
     break;
   case 45 ... 49:
     if (_useThreeQuarters)
     {
       // Use "three quarters x+1" for hh:45
-      currentWords[j++] = _M_DREIVIERTEL_;
+      currentWords.push_back(_M_DREIVIERTEL_);
     }
     else
     {
       // Use "quarter to x+1" for hh:45
-      currentWords[j++] = _M_VIERTEL_;
-      currentWords[j++] = _O_VOR_;
+      currentWords.push_back(_M_VIERTEL_);
+      currentWords.push_back(_O_VOR_);
     }
     currentHour += 1;
     break;
   case 50 ... 54:
-    currentWords[j++] = _M_ZEHN_;
-    currentWords[j++] = _O_VOR_;
+    currentWords.push_back(_M_ZEHN_);
+    currentWords.push_back(_O_VOR_);
     currentHour += 1;
     break;
   case 55 ... 59:
-    currentWords[j++] = _M_FUENF_;
-    currentWords[j++] = _O_VOR_;
+    currentWords.push_back(_M_FUENF_);
+    currentWords.push_back(_O_VOR_);
     currentHour += 1;
     break;
   }
@@ -169,63 +155,99 @@ void WordClock::updateHoursAndMinutes()
     // "Es ist ein Uhr", aber "es ist fünf nach eins".
     if ((currentMinute >= 0 && currentMinute < 2) || (currentMinute >= 57 && currentMinute <= 59))
     {
-      currentWords[j++] = _H_EIN_;
+      currentWords.push_back(_H_EIN_);
     }
     else
     {
-      currentWords[j++] = _H_EINS_;
+      currentWords.push_back(_H_EINS_);
     }
     break;
   case 2:
-    currentWords[j++] = _H_ZWEI_;
+    currentWords.push_back(_H_ZWEI_);
     break;
   case 3:
-    currentWords[j++] = _H_DREI_;
+    currentWords.push_back(_H_DREI_);
     break;
   case 4:
-    currentWords[j++] = _H_VIER_;
+    currentWords.push_back(_H_VIER_);
     break;
   case 5:
-    currentWords[j++] = _H_FUENF_;
+    currentWords.push_back(_H_FUENF_);
     break;
   case 6:
-    currentWords[j++] = _H_SECHS_;
+    currentWords.push_back(_H_SECHS_);
     break;
   case 7:
-    currentWords[j++] = _H_SIEBEN_;
+    currentWords.push_back(_H_SIEBEN_);
     break;
   case 8:
-    currentWords[j++] = _H_ACHT_;
+    currentWords.push_back(_H_ACHT_);
     break;
   case 9:
-    currentWords[j++] = _H_NEUN_;
+    currentWords.push_back(_H_NEUN_);
     break;
   case 10:
-    currentWords[j++] = _H_ZEHN_;
+    currentWords.push_back(_H_ZEHN_);
     break;
   case 11:
-    currentWords[j++] = _H_ELF_;
+    currentWords.push_back(_H_ELF_);
     break;
   case 12:
-    currentWords[j++] = _H_ZWOELF_;
+    currentWords.push_back(_H_ZWOELF_);
     break;
   default:
-    currentWords[j++] = _H_ZWOELF_;
+    currentWords.push_back(_H_ZWOELF_);
     break;
   }
+}
 
+void WordClock::updateHoursAndMinutes()
+{
+  int currentHour = _timeClient->getHours().toInt();
+  int currentMinute = _timeClient->getMinutes().toInt();
+  int currentSecond = _timeClient->getSeconds().toInt();
+  TWORDBUF currentWords;
+
+  // Adjust the time for special cases
+  adjustTime(currentHour, currentMinute, currentSecond);
+  createWords(currentWords, currentHour, currentMinute);
+
+  // Update the LED matrix if the values have changed
   if (_lastWords != currentWords)
   {
-    Serial.printf("%s Sending %d words:", _timeClient->getFormattedTime().c_str(), j);
+#ifdef DEBUG
+    Serial.printf("%s Sending %d words:", _timeClient->getFormattedTime().c_str(), currentWords.size());
+#endif
     clearAll();
-    for (int i = 0; i < j; i++)
+    for (size_t i = 0; i < currentWords.size(); i++)
     {
-      Serial.printf(" %d", currentWords[i]);
       sendWord(currentWords[i]);
     }
-    Serial.printf("\r\n");
     _lastWords = currentWords;
+#ifdef DEBUG
+    Serial.printf("\r\n");
+#endif
   }
+
+// Always update the minute LEDs if available
+#ifdef HAS_MINUTES
+  int8_t minutePart = (currentMinute % 5) - 1;
+  static CRGB minuteColor = CRGB(0xFF);
+  if (minutePart == -1)
+  {
+    // Erase buffer in minute 0 of 5 and pick a color for all minute LEDs
+    memset(_minuteLEDs, 0, sizeof(struct CRGB) * MINUTE_LEDS);
+    minuteColor = randomRGB();
+  }
+  else
+  {
+    // Set the color for all minutes up to the current minute
+    for (int i = 0; i <= minutePart; i++)
+    {
+      _minuteLEDs[i] = minuteColor;
+    }
+  }
+#endif
 }
 
 void WordClock::updateSeconds()
@@ -241,6 +263,12 @@ CRGB WordClock::randomRGB()
 
 void WordClock::sendWord(uint8_t index)
 {
+#ifdef DEBUG
+  char buffer[30];
+  strcpy_P(buffer, (char *)pgm_read_dword(&(DEBUGTWORDS[index])));
+  Serial.printf(" %d=%s", index, buffer);
+#endif
+
   CRGB actcolor = randomRGB();
   for (int j = 0; j < TLEDS[index].len; j++)
   {

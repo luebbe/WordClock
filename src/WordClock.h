@@ -75,6 +75,76 @@ enum TWORDS
   _LAST_
 };
 
+#ifdef DEBUG
+// Dummy
+const char C_NULL[] PROGMEM = "_null_";
+// Hours, capitalized to distinguish from the other numbers
+const char C_H_EIN[] PROGMEM = "EIN";
+const char C_H_EINS[] PROGMEM = "EINS";
+const char C_H_ZWEI[] PROGMEM = "ZWEI";
+const char C_H_DREI[] PROGMEM = "DREI";
+const char C_H_VIER[] PROGMEM = "VIER";
+const char C_H_FUENF[] PROGMEM = "FÜNF";
+const char C_H_SECHS[] PROGMEM = "SECHS";
+const char C_H_SIEBEN[] PROGMEM = "SIEBEN";
+const char C_H_ACHT[] PROGMEM = "ACHT";
+const char C_H_NEUN[] PROGMEM = "NEUN";
+const char C_H_ZEHN[] PROGMEM = "ZEHN";
+const char C_H_ELF[] PROGMEM = "ELF";
+const char C_H_ZWOELF[] PROGMEM = "ZWÖLF";
+// Minute distance towards the nearest (half) hour
+const char C_M_FUENF[] PROGMEM = "fünf";
+const char C_M_ZEHN[] PROGMEM = "zehn";
+const char C_M_ZWANZIG[] PROGMEM = "zwanzig";
+const char C_M_VIERTEL[] PROGMEM = "viertel";
+const char C_M_HALB[] PROGMEM = "halb";
+const char C_M_DREIVIERTEL[] PROGMEM = "dreiviertel";
+// Other words
+const char C_O_VOR[] PROGMEM = "vor";
+const char C_O_NACH[] PROGMEM = "nach";
+const char C_O_ES[] PROGMEM = "es";
+const char C_O_IST[] PROGMEM = "ist";
+const char C_O_UHR[] PROGMEM = "uhr";
+const char C_X_DREI[] PROGMEM = "drei";
+const char C_X_VIER[] PROGMEM = "vier";
+const char C_X_VIERTEL[] PROGMEM = "viertel";
+// Dummy
+const char C_LAST[] PROGMEM = "_last_";
+
+const char *const DEBUGTWORDS[] PROGMEM = {
+    C_NULL,
+    C_H_EIN,
+    C_H_EINS,
+    C_H_ZWEI,
+    C_H_DREI,
+    C_H_VIER,
+    C_H_FUENF,
+    C_H_SECHS,
+    C_H_SIEBEN,
+    C_H_ACHT,
+    C_H_NEUN,
+    C_H_ZEHN,
+    C_H_ELF,
+    C_H_ZWOELF,
+    C_M_FUENF,
+    C_M_ZEHN,
+    C_M_ZWANZIG,
+    C_M_VIERTEL,
+    C_M_HALB,
+    C_M_DREIVIERTEL,
+    C_O_VOR,
+    C_O_NACH,
+    C_O_ES,
+    C_O_IST,
+    C_O_UHR,
+    C_X_DREI,
+    C_X_VIER,
+    C_X_VIERTEL,
+    C_LAST
+
+};
+#endif
+
 struct TWORDINFO
 {
   uint8_t x;
@@ -121,7 +191,7 @@ static const TWORDINFO TLEDS[] = {
 class WordClock : public LedMatrix
 {
 private:
-#define cMaxWords 10 // Should be enough ;)
+  typedef std::vector<uint8_t> TWORDBUF;
 
   TimeClient *_timeClient;
 
@@ -130,10 +200,12 @@ private:
 
   unsigned long _updateInterval;
   unsigned long _lastUpdate;
-  std::array<uint8_t, cMaxWords> _lastWords; // Buffer for the last words that have been sent to the matrix
-  bool _useThreeQuarters;                    // Use "quarter to"/"quarter past" or "quarter"/"three quarters" depending on region
+  TWORDBUF _lastWords;    // Buffer for the last words that have been sent to the matrix
+  bool _useThreeQuarters; // Use "quarter to"/"quarter past" or "quarter"/"three quarters" depending on region
 
   CRGB randomRGB();
+  void adjustTime(int &hour, int &minute, int &second);
+  void createWords(TWORDBUF &currentWords, int &currentHour, int &currentMinute);
   void updateHoursAndMinutes();
   void updateSeconds();
 
