@@ -10,39 +10,35 @@
 WordClock::WordClock(CRGB *leds, TimeClient *timeClient)
     : LedMatrix(leds, MATRIX_WIDTH, MATRIX_HEIGHT),
       _timeClient(timeClient),
-      _updateInterval(1),
+      _minuteColor(CRGB(0xFF00FF)), // Initial color for the minute LEDs
+      _secondColor(CRGB(0x00FFFF)), // Initial color for the second LEDs
       _lastUpdate(0),
       _useThreeQuarters(false)
 {
   _lastWords.clear();
-
-  //##DEBUG REMOVE
-  _minuteLEDs = (_matrixLEDs + 7); // last four LEDs in bottom row for debugging
-  // _minuteLEDs = (_matrixLEDs + _width * _height);  // Pointer to the start of the buffer for the minute LEDs
-  _secondLEDs = (_minuteLEDs + MINUTE_LEDS); // Pointer to the start of the buffer for the second LEDs
+  _minuteLEDs = (_matrixLEDs + MATRIX_WIDTH * MATRIX_HEIGHT); // Pointer to the start of the buffer for the minute LEDs
+  _secondLEDs = (_minuteLEDs + MINUTE_LEDS);                  // Pointer to the start of the buffer for the second LEDs
 }
 
 void WordClock::setup()
 {
   LedMatrix::setup();
 
-  //##DEBUG REMOVE
-  Serial.printf("%10d %10d %10d\r\n", int(_matrixLEDs), int(_minuteLEDs), int(_secondLEDs));
-
-  _timeClient->updateTime();
+  memset8(_minuteLEDs, 0, sizeof(struct CRGB) * MINUTE_LEDS);
+  memset8(_secondLEDs, 0, sizeof(struct CRGB) * SECOND_LEDS);
 }
 
 void WordClock::loop()
 {
   LedMatrix::loop();
 
-  if ((millis() - _lastUpdate >= _updateInterval * 1000UL) || (_lastUpdate == 0))
+  ulong now = millis();
+  if ((now - _lastUpdate >= 1000UL) || (_lastUpdate == 0))
   {
-    _timeClient->updateTime();
+    _lastUpdate = now;
     updateHoursAndMinutes();
     updateSeconds();
     FastLED.show();
-    _lastUpdate = millis();
   }
 }
 
@@ -89,12 +85,12 @@ void WordClock::createWords(TWORDBUF &currentWords, int &currentHour, int &curre
   case 15 ... 19:
     if (_useThreeQuarters)
     {
-      // Use "quarter x+1" for hh:15
+      // Use "quarter hh+1" for hh:15
       currentWords.push_back(_M_VIERTEL_);
     }
     else
     {
-      // Use "quarter past x" for hh:15
+      // Use "quarter past hh" for hh:15
       currentWords.push_back(_M_VIERTEL_);
       currentWords.push_back(_O_NACH_);
     }
@@ -127,12 +123,12 @@ void WordClock::createWords(TWORDBUF &currentWords, int &currentHour, int &curre
   case 45 ... 49:
     if (_useThreeQuarters)
     {
-      // Use "three quarters x+1" for hh:45
+      // Use "three quarters hh+1" for hh:45
       currentWords.push_back(_M_DREIVIERTEL_);
     }
     else
     {
-      // Use "quarter to x+1" for hh:45
+      // Use "quarter to hh+1" for hh:45
       currentWords.push_back(_M_VIERTEL_);
       currentWords.push_back(_O_VOR_);
     }
@@ -232,20 +228,19 @@ void WordClock::updateHoursAndMinutes()
 
 // Always update the minute LEDs if available
 #ifdef HAS_MINUTES
-  int8_t minutePart = (currentMinute % 5) - 1;
-  static CRGB minuteColor = CRGB(0xFF);
-  if (minutePart == -1)
+  int minuteIndex = (currentMinute % 5) - 1;
+  if (minuteIndex == -1)
   {
     // Erase buffer in minute 0 of 5 and pick a color for all minute LEDs
-    memset(_minuteLEDs, 0, sizeof(struct CRGB) * MINUTE_LEDS);
-    minuteColor = randomRGB();
+    memset8(_minuteLEDs, 0, sizeof(struct CRGB) * MINUTE_LEDS);
+    _minuteColor = randomRGB();
   }
   else
   {
     // Set the color for all minutes up to the current minute
-    for (int i = 0; i <= minutePart; i++)
+    for (int i = 0; i <= minuteIndex; i++)
     {
-      _minuteLEDs[i] = minuteColor;
+      _minuteLEDs[i] = _minuteColor;
     }
   }
 #endif
@@ -253,7 +248,22 @@ void WordClock::updateHoursAndMinutes()
 
 void WordClock::updateSeconds()
 {
-  int seconds = _timeClient->getSeconds().toInt();
+#ifdef HAS_SECONDS
+  int secondIndex = (_timeClient->getSeconds().toInt() * SECOND_LEDS / 60);
+
+  // Erase buffer in second 0 and pick a new color for all LEDs for the next minute
+  if (secondIndex == 0)
+  {
+    memset8(_secondLEDs, 0, sizeof(struct CRGB) * SECOND_LEDS);
+    _secondColor = randomRGB();
+  }
+
+  // Now add the offset for the "real" LED number zero
+  secondIndex = (secondIndex + SECOND_OFFSET) % SECOND_LEDS;
+
+  // This fills the second LEDs with the color
+  _secondLEDs[secondIndex] = _secondColor;
+#endif
 }
 
 CRGB WordClock::randomRGB()

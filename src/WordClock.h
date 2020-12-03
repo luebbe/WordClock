@@ -13,13 +13,16 @@
 
 #define DEBUG
 
+// The data flow through this word clock is the following:
+// INPUT -> Matrix LEDs -> Minute LEDs -> Second LEDs (-> Other LEDs).
+
 // LED matrix of 11x10 pixels with 0,0 at the bottom left
 // The matrix has to be the *first* section of the LED chain, because of the "safety pixel"
 #define MATRIX_WIDTH 11
 #define MATRIX_HEIGHT 10
 
 // Uncomment the following line if you have LEDs for the minutes *after* the matrix
-// #define HAS_MINUTES
+#define HAS_MINUTES
 
 #ifdef HAS_MINUTES
 #define MINUTE_LEDS 4 // One LED in each corner for minutes 1..4
@@ -28,14 +31,17 @@
 #endif
 
 // Uncomment the following line if you have LEDs for the seconds *after* the LEDS for the minutes
-// #define HAS_SECONDS
+#define HAS_SECONDS
 
-#ifdef HAS_SECONDS
+// The number of LEDs that you have to display the seconds. The steps are calculated accordingly e.g.:
+// 60 -> one step every second
+// 30 -> one step every 2 seconds
+// 15 -> one step every 4 seconds
 #define SECOND_LEDS 60
-#define SECOND_LEDS 30
-#else
-#define SECOND_LEDS 0
-#endif
+
+// The modulo offset for the LED which stands for second zero.
+// This depends on where your LED ring starts (in my case it's the bottom center of the clock)
+#define SECOND_OFFSET 30
 
 enum TWORDS
 {
@@ -194,16 +200,18 @@ private:
   typedef std::vector<uint8_t> TWORDBUF;
 
   TimeClient *_timeClient;
+  CRGB _minuteColor;      // Color for the minute LEDs
+  CRGB _secondColor;      // Color for the second LEDs
+  bool _useThreeQuarters; // Use "quarter to"/"quarter past" or "quarter"/"three quarters" depending on region
+  unsigned long _lastUpdate;
 
   CRGB *_minuteLEDs; // Pointer to the start of the buffer for the minute LEDs
   CRGB *_secondLEDs; // Pointer to the start of the buffer for the second LEDs
 
-  unsigned long _updateInterval;
-  unsigned long _lastUpdate;
-  TWORDBUF _lastWords;    // Buffer for the last words that have been sent to the matrix
-  bool _useThreeQuarters; // Use "quarter to"/"quarter past" or "quarter"/"three quarters" depending on region
+  TWORDBUF _lastWords; // Buffer for the last words that have been sent to the matrix
 
-  CRGB randomRGB();
+  CRGB randomRGB(); // For now just random RGB colors. May become a time based effect or fancy rainbow/lookup table in the future
+
   void adjustTime(int &hour, int &minute, int &second);
   void createWords(TWORDBUF &currentWords, int &currentHour, int &currentMinute);
   void updateHoursAndMinutes();

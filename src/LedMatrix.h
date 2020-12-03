@@ -133,5 +133,5 @@ public:
   void scrollUp();
   void scrollDown();
 
-  void setBrightness(uint8_t value) { _brightness = value; }
+  void setBrightness(uint8_t value);
 };

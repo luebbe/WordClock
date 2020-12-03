@@ -17,7 +17,7 @@ LedMatrix::LedMatrix(CRGB *leds, uint8_t width, uint8_t height, bool serpentineL
       _width(width), _height(height),
       _serpentineLayout(serpentineLayout),
       _vertical(vertical),
-      _brightness(0)
+      _brightness(10)
 {
 }
 
@@ -33,8 +33,14 @@ void LedMatrix::setup()
 
 void LedMatrix::clearAll()
 {
-  memset(_matrixLEDs, 0, sizeof(struct CRGB) * _width * _height);
+  memset8(_matrixLEDs, 0, sizeof(struct CRGB) * _width * _height);
   FastLED.show();
+}
+
+void LedMatrix::setBrightness(uint8_t value)
+{
+  _brightness = value;
+  FastLED.setBrightness(_brightness); // Eventually fade to target brightness
 }
 
 void LedMatrix::scrollLeft()
