@@ -12,8 +12,8 @@ WordClock::WordClock(CRGB *leds, TimeClient *timeClient)
       _timeClient(timeClient),
       _minuteColor(CRGB(0xFF00FF)), // Initial color for the minute LEDs
       _secondColor(CRGB(0x00FFFF)), // Initial color for the second LEDs
-      _lastUpdate(0),
-      _useThreeQuarters(false)
+      _useThreeQuarters(false),
+      _lastUpdate(0)
 {
   _lastWords.clear();
   _minuteLEDs = (_matrixLEDs + MATRIX_WIDTH * MATRIX_HEIGHT); // Pointer to the start of the buffer for the minute LEDs
