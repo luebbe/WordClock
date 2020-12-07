@@ -31,54 +31,35 @@ Timezone Europe(CEST, CET);
 CRGB leds_plus_safety_pixel[NUM_LEDS + 1];    // The first pixel in this array is the safety pixel for "out of bounds" results. Never use this array directly!
 CRGB *const leds(leds_plus_safety_pixel + 1); // This is the "off-by-one" array that we actually work with and which is passed to FastLED!
 
-bool onGetTime(int &hour, int &minute, int &second);
-
-WordClock wordClock(leds, &onGetTime);
-
-time_t getUtcTime()
-{
-  if (timeClient.update())
-  {
-    return timeClient.getEpochTime();
-  }
-  else
-  {
-    return 0;
-  }
-}
+bool onGetTime(int &hours, int &minutes, int &seconds);
+WordClock wordClock(leds, onGetTime);
 
 bool onGetTime(int &hours, int &minutes, int &seconds)
 {
-  time_t localTime = Europe.toLocal(getUtcTime());
+  if (timeClient.update())
+  {
+    time_t localTime = Europe.toLocal(timeClient.getEpochTime());
 
-  hours = ((localTime % 86400L) / 3600) % 24;
-  minutes = (localTime % 3600) / 60;
-  seconds = localTime % 60;
+    hours = ((localTime % 86400L) / 3600) % 24;
+    minutes = (localTime % 3600) / 60;
+    seconds = localTime % 60;
 
-  return true;
-}
-
-void timeClientSetup()
-{
-  // initialize NTP Client
-  timeClient.begin();
-
-  // Set callback for time library and leave the sync to the NTP client
-  setSyncProvider(getUtcTime);
-  setSyncInterval(0);
+    return true;
+  }
+  else
+  {
+    return false;
+  }
 }
 
 void setup()
 {
   Serial.begin(SERIAL_SPEED);
 
-  FastLED.addLeds<CHIPSET, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalSMD5050);
-
-  timeClientSetup();
+  FastLED.addLeds<CHIPSET, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
 
   wordClock.setBrightness(BRIGHTNESS);
   wordClock.setup();
-
   // Connect to WiFi
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED)
@@ -95,6 +76,9 @@ void setup()
   Serial.println("WiFi connected");
   leds[0] = 0;
   FastLED.show();
+
+  // initialize NTP Client after WiFi is connected
+  timeClient.begin();
 }
 
 void loop()

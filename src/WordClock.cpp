@@ -50,22 +50,22 @@ void WordClock::loop()
   }
 }
 
-void WordClock::adjustTime(int &hour, int &minute, int &second)
+void WordClock::adjustTime(int &hours, int &minutes, int &seconds)
 {
-  if (hour > 12)
-    hour = hour - 12;
+  if (hours > 12)
+    hours = hours - 12;
 
 // When there are no minute LEDs, advance the clock by 2.5 minutes.
 // so that the current time is "centered" around the displayed time.
 // e.g. 16:57:30..17:02:29 are shown as "five o'clock"
 #ifndef HAS_MINUTES
-  int minuteOffset = (_timeClient->getSeconds().toInt() < 30 ? 2 : 3);
+  int minuteOffset = (seconds < 30 ? 2 : 3);
   // Check whether the offset pushes us into the next hour
-  if (minute + minuteOffset >= 60)
+  if (minutes + minuteOffset >= 60)
   {
-    hour++;
+    hours++;
   }
-  minute = (minute + minuteOffset) % 60;
+  minutes = (minutes + minuteOffset) % 60;
 #endif
 }
 
@@ -206,19 +206,19 @@ void WordClock::createWords(TWORDBUF &currentWords, int &hour, int &minute)
   }
 }
 
-void WordClock::updateHoursAndMinutes(int &hour, int &minute, int &second)
+void WordClock::updateHoursAndMinutes(int &hours, int &minutes, int &seconds)
 {
   TWORDBUF currentWords;
 
   // Adjust the time for special cases
-  adjustTime(hour, minute, second);
-  createWords(currentWords, hour, minute);
+  adjustTime(hours, minutes, seconds);
+  createWords(currentWords, hours, minutes);
 
   // Update the LED matrix if the values have changed
   if (_lastWords != currentWords)
   {
 #ifdef DEBUG
-//##LO    Serial.printf("%s Sending %d words:", _timeClient->getFormattedTime().c_str(), currentWords.size());
+    Serial.printf("Sending %d words:", currentWords.size());
 #endif
     clearAll();
     for (size_t i = 0; i < currentWords.size(); i++)
@@ -233,7 +233,7 @@ void WordClock::updateHoursAndMinutes(int &hour, int &minute, int &second)
 
 // Always update the minute LEDs if available
 #ifdef HAS_MINUTES
-  int minuteIndex = (minute % 5) - 1;
+  int minuteIndex = (minutes % 5) - 1;
   if (minuteIndex == -1)
   {
     // Erase buffer in minute 0 of 5 and pick a color for all minute LEDs
@@ -251,10 +251,10 @@ void WordClock::updateHoursAndMinutes(int &hour, int &minute, int &second)
 #endif
 }
 
-void WordClock::updateSeconds(int &second)
+void WordClock::updateSeconds(int &seconds)
 {
 #ifdef HAS_SECONDS
-  int secondIndex = (second * SECOND_LEDS / 60);
+  int secondIndex = (seconds * SECOND_LEDS / 60);
 
   // Erase buffer in second 0 and pick a new color for all LEDs for the next minute
   if (secondIndex == 0)

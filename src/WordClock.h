@@ -32,17 +32,22 @@
 // Uncomment the following line if you have LEDs for the seconds *after* the LEDS for the minutes
 #define HAS_SECONDS
 
+#ifdef HAS_SECONDS
 // The number of LEDs that you have to display the seconds. The steps are calculated accordingly e.g.:
 // 60 -> one step every second
 // 30 -> one step every 2 seconds
 // 15 -> one step every 4 seconds
 #define SECOND_LEDS 60
-
 // The modulo offset for the LED which stands for second zero.
 // This depends on where your LED ring starts (in my case it's the bottom center of the clock)
 #define SECOND_OFFSET 30
+#else
+// No LEDs for the seconds
+#define SECOND_LEDS 0
+#define SECOND_OFFSET 0
+#endif
 
-typedef std::function<bool(int &hour, int &minute, int &second)> TGetTimeFunction;
+typedef std::function<bool(int &hours, int &minutes, int &seconds)> TGetTimeFunction;
 
 class WordClock : public LedMatrix
 {
@@ -62,10 +67,10 @@ private:
 
   CRGB randomRGB(); // For now just random RGB colors. May become a time based effect or fancy rainbow/lookup table in the future
 
-  void adjustTime(int &hour, int &minute, int &second);
+  void adjustTime(int &hours, int &minutes, int &seconds);
   void createWords(TWORDBUF &currentWords, int &currentHour, int &currentMinute);
-  void updateHoursAndMinutes(int &hour, int &minute, int &second);
-  void updateSeconds(int &second);
+  void updateHoursAndMinutes(int &hours, int &minutes, int &seconds);
+  void updateSeconds(int &seconds);
 
   void sendWord(uint8_t index);
 
