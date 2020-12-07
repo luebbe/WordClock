@@ -1,6 +1,12 @@
 #include <FastLED.h>
-#include "WordClock.h"
+#include <ESP8266WiFi.h>
+#include <WiFiUdp.h>
+#include <NTPClient.h>
+#include <TimeZone.h>
+#include <TimeLib.h>
+#include <time.h>
 
+#include "WordClock.h"
 #include "secrets.h"
 
 #define LED_PIN 5 // D1 on D1 Mini
@@ -9,16 +15,58 @@
 #define CHIPSET WS2812
 
 #define BRIGHTNESS 20
-const float UTC_OFFSET = 1;
 
-TimeClient timeClient(UTC_OFFSET);
+const char *TC_SERVER = "europe.pool.ntp.org";
+
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, TC_SERVER);
+
+// For starters use hardwired Central European Time (Berlin, Paris, ...)
+TimeChangeRule CEST = {"CEST", Last, Sun, Mar, 2, 120}; // Central European Summer Time
+TimeChangeRule CET = {"CET ", Last, Sun, Oct, 3, 60};   // Central European Standard Time
+Timezone Europe(CEST, CET);
 
 // Params for width, height and number of extra LEDs are defined in WordClock.h
 #define NUM_LEDS (MATRIX_WIDTH * MATRIX_HEIGHT) + MINUTE_LEDS + SECOND_LEDS
 CRGB leds_plus_safety_pixel[NUM_LEDS + 1];    // The first pixel in this array is the safety pixel for "out of bounds" results. Never use this array directly!
 CRGB *const leds(leds_plus_safety_pixel + 1); // This is the "off-by-one" array that we actually work with and which is passed to FastLED!
 
-WordClock wordClock(leds, &timeClient);
+bool onGetTime(int &hour, int &minute, int &second);
+
+WordClock wordClock(leds, &onGetTime);
+
+time_t getUtcTime()
+{
+  if (timeClient.update())
+  {
+    return timeClient.getEpochTime();
+  }
+  else
+  {
+    return 0;
+  }
+}
+
+bool onGetTime(int &hours, int &minutes, int &seconds)
+{
+  time_t localTime = Europe.toLocal(getUtcTime());
+
+  hours = ((localTime % 86400L) / 3600) % 24;
+  minutes = (localTime % 3600) / 60;
+  seconds = localTime % 60;
+
+  return true;
+}
+
+void timeClientSetup()
+{
+  // initialize NTP Client
+  timeClient.begin();
+
+  // Set callback for time library and leave the sync to the NTP client
+  setSyncProvider(getUtcTime);
+  setSyncInterval(0);
+}
 
 void setup()
 {
@@ -45,18 +93,9 @@ void setup()
   Serial.println("WiFi connected");
   leds[0] = 0;
   FastLED.show();
-
-  timeClient.updateTime();
-  Serial.println("Time updated");
 }
 
 void loop()
 {
-  if (timeClient.getHours() == 0)
-  {
-    timeClient.updateTime();
-    Serial.println("Time updated");
-  }
-
   wordClock.loop();
 }

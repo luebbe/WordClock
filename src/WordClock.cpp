@@ -7,9 +7,9 @@
 
 #include "WordClock.h"
 
-WordClock::WordClock(CRGB *leds, TimeClient *timeClient)
+WordClock::WordClock(CRGB *leds, TGetTimeFunction onGetTime)
     : LedMatrix(leds, MATRIX_WIDTH, MATRIX_HEIGHT),
-      _timeClient(timeClient),
+      _onGetTime(onGetTime),
       _minuteColor(CRGB(0xFF00FF)), // Initial color for the minute LEDs
       _secondColor(CRGB(0x00FFFF)), // Initial color for the second LEDs
       _useThreeQuarters(false),
@@ -36,9 +36,17 @@ void WordClock::loop()
   if ((now - _lastUpdate >= 1000UL) || (_lastUpdate == 0))
   {
     _lastUpdate = now;
-    updateHoursAndMinutes();
-    updateSeconds();
-    FastLED.show();
+
+    int hour;
+    int minute;
+    int second;
+
+    if (_onGetTime(hour, minute, second))
+    {
+      updateHoursAndMinutes(hour, minute, second);
+      updateSeconds(second);
+      FastLED.show();
+    }
   }
 }
 
@@ -61,14 +69,14 @@ void WordClock::adjustTime(int &hour, int &minute, int &second)
 #endif
 }
 
-void WordClock::createWords(TWORDBUF &currentWords, int &currentHour, int &currentMinute)
+void WordClock::createWords(TWORDBUF &currentWords, int &hour, int &minute)
 {
   // The order of the word indexes in the array is not the order of the words on the display.
   currentWords.clear();
   currentWords.push_back(_O_ES_);
   currentWords.push_back(_O_IST_);
 
-  switch (currentMinute)
+  switch (minute)
   {
   case 0 ... 4:
     // This places "o'clock" before the hour in the output array, but it's only visible in the debug output.
@@ -103,22 +111,22 @@ void WordClock::createWords(TWORDBUF &currentWords, int &currentHour, int &curre
     currentWords.push_back(_M_FUENF_);
     currentWords.push_back(_O_VOR_);
     currentWords.push_back(_M_HALB_);
-    currentHour += 1;
+    hour += 1;
     break;
   case 30 ... 34:
     currentWords.push_back(_M_HALB_);
-    currentHour += 1;
+    hour += 1;
     break;
   case 35 ... 39:
     currentWords.push_back(_M_FUENF_);
     currentWords.push_back(_O_NACH_);
     currentWords.push_back(_M_HALB_);
-    currentHour += 1;
+    hour += 1;
     break;
   case 40 ... 44:
     currentWords.push_back(_M_ZWANZIG_);
     currentWords.push_back(_O_VOR_);
-    currentHour += 1;
+    hour += 1;
     break;
   case 45 ... 49:
     if (_useThreeQuarters)
@@ -132,25 +140,25 @@ void WordClock::createWords(TWORDBUF &currentWords, int &currentHour, int &curre
       currentWords.push_back(_M_VIERTEL_);
       currentWords.push_back(_O_VOR_);
     }
-    currentHour += 1;
+    hour += 1;
     break;
   case 50 ... 54:
     currentWords.push_back(_M_ZEHN_);
     currentWords.push_back(_O_VOR_);
-    currentHour += 1;
+    hour += 1;
     break;
   case 55 ... 59:
     currentWords.push_back(_M_FUENF_);
     currentWords.push_back(_O_VOR_);
-    currentHour += 1;
+    hour += 1;
     break;
   }
 
-  switch (currentHour)
+  switch (hour)
   {
   case 1:
     // "Es ist ein Uhr", aber "es ist fünf nach eins".
-    if ((currentMinute >= 0 && currentMinute < 2) || (currentMinute >= 57 && currentMinute <= 59))
+    if ((minute >= 0 && minute < 2) || (minute >= 57 && minute <= 59))
     {
       currentWords.push_back(_H_EIN_);
     }
@@ -198,22 +206,19 @@ void WordClock::createWords(TWORDBUF &currentWords, int &currentHour, int &curre
   }
 }
 
-void WordClock::updateHoursAndMinutes()
+void WordClock::updateHoursAndMinutes(int &hour, int &minute, int &second)
 {
-  int currentHour = _timeClient->getHours().toInt();
-  int currentMinute = _timeClient->getMinutes().toInt();
-  int currentSecond = _timeClient->getSeconds().toInt();
   TWORDBUF currentWords;
 
   // Adjust the time for special cases
-  adjustTime(currentHour, currentMinute, currentSecond);
-  createWords(currentWords, currentHour, currentMinute);
+  adjustTime(hour, minute, second);
+  createWords(currentWords, hour, minute);
 
   // Update the LED matrix if the values have changed
   if (_lastWords != currentWords)
   {
 #ifdef DEBUG
-    Serial.printf("%s Sending %d words:", _timeClient->getFormattedTime().c_str(), currentWords.size());
+//##LO    Serial.printf("%s Sending %d words:", _timeClient->getFormattedTime().c_str(), currentWords.size());
 #endif
     clearAll();
     for (size_t i = 0; i < currentWords.size(); i++)
@@ -228,7 +233,7 @@ void WordClock::updateHoursAndMinutes()
 
 // Always update the minute LEDs if available
 #ifdef HAS_MINUTES
-  int minuteIndex = (currentMinute % 5) - 1;
+  int minuteIndex = (minute % 5) - 1;
   if (minuteIndex == -1)
   {
     // Erase buffer in minute 0 of 5 and pick a color for all minute LEDs
@@ -246,10 +251,10 @@ void WordClock::updateHoursAndMinutes()
 #endif
 }
 
-void WordClock::updateSeconds()
+void WordClock::updateSeconds(int &second)
 {
 #ifdef HAS_SECONDS
-  int secondIndex = (_timeClient->getSeconds().toInt() * SECOND_LEDS / 60);
+  int secondIndex = (second * SECOND_LEDS / 60);
 
   // Erase buffer in second 0 and pick a new color for all LEDs for the next minute
   if (secondIndex == 0)

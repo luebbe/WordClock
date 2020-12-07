@@ -9,7 +9,6 @@
 
 #include <FastLED.h>
 #include "LedMatrix.h"
-#include "TimeClient.h"
 
 #define DEBUG
 
@@ -42,6 +41,42 @@
 // The modulo offset for the LED which stands for second zero.
 // This depends on where your LED ring starts (in my case it's the bottom center of the clock)
 #define SECOND_OFFSET 30
+
+typedef std::function<bool(int &hour, int &minute, int &second)> TGetTimeFunction;
+
+class WordClock : public LedMatrix
+{
+private:
+  typedef std::vector<uint8_t> TWORDBUF;
+
+  TGetTimeFunction _onGetTime;
+  CRGB _minuteColor;      // Color for the minute LEDs
+  CRGB _secondColor;      // Color for the second LEDs
+  bool _useThreeQuarters; // Use "quarter to"/"quarter past" or "quarter"/"three quarters" depending on region
+  unsigned long _lastUpdate;
+
+  CRGB *_minuteLEDs; // Pointer to the start of the buffer for the minute LEDs
+  CRGB *_secondLEDs; // Pointer to the start of the buffer for the second LEDs
+
+  TWORDBUF _lastWords; // Buffer for the last words that have been sent to the matrix
+
+  CRGB randomRGB(); // For now just random RGB colors. May become a time based effect or fancy rainbow/lookup table in the future
+
+  void adjustTime(int &hour, int &minute, int &second);
+  void createWords(TWORDBUF &currentWords, int &currentHour, int &currentMinute);
+  void updateHoursAndMinutes(int &hour, int &minute, int &second);
+  void updateSeconds(int &second);
+
+  void sendWord(uint8_t index);
+
+public:
+  explicit WordClock(CRGB *leds, TGetTimeFunction onGetTime);
+
+  virtual void loop() override;
+  virtual void setup() override;
+
+  void setUseThreeQuarters(bool value) { _useThreeQuarters = value; }
+};
 
 enum TWORDS
 {
@@ -192,38 +227,4 @@ static const TWORDINFO TLEDS[] = {
     {5, 7, 4},  // _X_VIER_
     {5, 7, 7},  // _X_VIERTEL_
     {0, 0, 0}   // LAST
-};
-
-class WordClock : public LedMatrix
-{
-private:
-  typedef std::vector<uint8_t> TWORDBUF;
-
-  TimeClient *_timeClient;
-  CRGB _minuteColor;      // Color for the minute LEDs
-  CRGB _secondColor;      // Color for the second LEDs
-  bool _useThreeQuarters; // Use "quarter to"/"quarter past" or "quarter"/"three quarters" depending on region
-  unsigned long _lastUpdate;
-
-  CRGB *_minuteLEDs; // Pointer to the start of the buffer for the minute LEDs
-  CRGB *_secondLEDs; // Pointer to the start of the buffer for the second LEDs
-
-  TWORDBUF _lastWords; // Buffer for the last words that have been sent to the matrix
-
-  CRGB randomRGB(); // For now just random RGB colors. May become a time based effect or fancy rainbow/lookup table in the future
-
-  void adjustTime(int &hour, int &minute, int &second);
-  void createWords(TWORDBUF &currentWords, int &currentHour, int &currentMinute);
-  void updateHoursAndMinutes();
-  void updateSeconds();
-
-  void sendWord(uint8_t index);
-
-public:
-  explicit WordClock(CRGB *leds, TimeClient *timeClient);
-
-  virtual void loop() override;
-  virtual void setup() override;
-
-  void setUseThreeQuarters(bool value) { _useThreeQuarters = value; }
 };
