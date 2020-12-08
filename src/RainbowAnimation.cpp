@@ -15,22 +15,14 @@ RainbowAnimation::RainbowAnimation(CRGB *leds, uint8_t width, uint8_t height, bo
 {
 }
 
-void RainbowAnimation::loop()
+void RainbowAnimation::loop(bool forceUpdate)
 {
-  LedMatrix::loop();
+  LedMatrix::loop(forceUpdate);
 
   uint32_t ms = millis();
   int32_t yHueDelta32 = ((int32_t)cos16(ms * (27 / 1)) * (350 / _width));
   int32_t xHueDelta32 = ((int32_t)cos16(ms * (39 / 1)) * (310 / _height));
   DrawOneFrame(ms / 65536, yHueDelta32 / 32768, xHueDelta32 / 32768);
-  if (ms < 5000)
-  {
-    FastLED.setBrightness(scale8(_brightness, (ms * 256) / 5000));
-  }
-  else
-  {
-    FastLED.setBrightness(_brightness);
-  }
   FastLED.show();
 }
 

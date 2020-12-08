@@ -28,23 +28,32 @@ void WordClock::setup()
   memset8(_secondLEDs, 0, sizeof(struct CRGB) * SECOND_LEDS);
 }
 
-void WordClock::loop()
+void WordClock::loop(bool forceUpdate)
 {
-  LedMatrix::loop();
+  LedMatrix::loop(forceUpdate);
 
   ulong now = millis();
-  if ((now - _lastUpdate >= 1000UL) || (_lastUpdate == 0))
+  if (forceUpdate || (now - _lastUpdate >= 1000UL) || (_lastUpdate == 0))
   {
     _lastUpdate = now;
 
-    int hour;
-    int minute;
-    int second;
-
-    if (_onGetTime(hour, minute, second))
+    if (forceUpdate)
     {
-      updateHoursAndMinutes(hour, minute, second);
-      updateSeconds(second);
+      _lastWords.clear();
+    }
+
+    int hours;
+    int minutes;
+    int seconds;
+
+    if (_onGetTime(hours, minutes, seconds))
+    {
+      // Adjust the time for special cases
+      adjustTime(hours, minutes, seconds);
+
+      updateHours(hours, minutes);
+      updateMinutes(minutes);
+      updateSeconds(seconds);
       FastLED.show();
     }
   }
@@ -206,12 +215,10 @@ void WordClock::createWords(TWORDBUF &currentWords, int &hour, int &minute)
   }
 }
 
-void WordClock::updateHoursAndMinutes(int &hours, int &minutes, int &seconds)
+void WordClock::updateHours(int &hours, int &minutes)
 {
   TWORDBUF currentWords;
 
-  // Adjust the time for special cases
-  adjustTime(hours, minutes, seconds);
   createWords(currentWords, hours, minutes);
 
   // Update the LED matrix if the values have changed
@@ -230,7 +237,10 @@ void WordClock::updateHoursAndMinutes(int &hours, int &minutes, int &seconds)
     Serial.printf("\r\n");
 #endif
   }
+}
 
+void WordClock::updateMinutes(int &minutes)
+{
 // Always update the minute LEDs if available
 #ifdef HAS_MINUTES
   int minuteIndex = (minutes % 5) - 1;

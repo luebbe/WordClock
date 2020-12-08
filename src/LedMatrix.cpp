@@ -21,8 +21,16 @@ LedMatrix::LedMatrix(CRGB *leds, uint8_t width, uint8_t height, bool serpentineL
 {
 }
 
-void LedMatrix::loop()
+void LedMatrix::loop(bool forceUpdate)
 {
+  // if (ms < 5000)
+  // {
+  //   FastLED.setBrightness(scale8(_brightness, (ms * 256) / 5000));
+  // }
+  // else
+  // {
+  //   FastLED.setBrightness(_brightness);
+  // }
 }
 
 void LedMatrix::setup()
@@ -35,6 +43,11 @@ void LedMatrix::clearAll()
 {
   memset8(_matrixLEDs, 0, sizeof(struct CRGB) * _width * _height);
   FastLED.show();
+}
+
+uint8_t LedMatrix::getBrightness()
+{
+  return _brightness;
 }
 
 void LedMatrix::setBrightness(uint8_t value)

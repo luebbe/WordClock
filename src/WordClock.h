@@ -69,15 +69,16 @@ private:
 
   void adjustTime(int &hours, int &minutes, int &seconds);
   void createWords(TWORDBUF &currentWords, int &currentHour, int &currentMinute);
-  void updateHoursAndMinutes(int &hours, int &minutes, int &seconds);
-  void updateSeconds(int &seconds);
-
   void sendWord(uint8_t index);
+  
+  void updateHours(int &hours, int &minutes);
+  void updateMinutes(int &minutes);
+  void updateSeconds(int &seconds);
 
 public:
   explicit WordClock(CRGB *leds, TGetTimeFunction onGetTime);
 
-  virtual void loop() override;
+  virtual void loop(bool forceUpdate) override;
   virtual void setup() override;
 
   void setUseThreeQuarters(bool value) { _useThreeQuarters = value; }

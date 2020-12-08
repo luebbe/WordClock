@@ -124,7 +124,7 @@ protected:
 public:
   explicit LedMatrix(CRGB *leds, uint8_t width, uint8_t height, bool sepentineLayout = true, bool vertical = false);
 
-  virtual void loop();
+  virtual void loop(bool forceUpdate);
   virtual void setup();
 
   void clearAll();
@@ -133,5 +133,6 @@ public:
   void scrollUp();
   void scrollDown();
 
+  uint8_t getBrightness();
   void setBrightness(uint8_t value);
 };
