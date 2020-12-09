@@ -33,6 +33,9 @@ Ticker wifiReconnectTimer;
 AsyncMqttClient mqttClient;
 Ticker mqttReconnectTimer;
 
+Ticker ledTicker;
+const float LED_BLINK_DELAY = 0.5;
+
 uint8_t displayMode = 0;
 bool modeChanged = false;
 
@@ -69,31 +72,33 @@ void setMode(std::string value)
   }
 }
 
-void blinkLED(int index)
+void blinkLED(CRGB::HTMLColorCode color)
 {
-  if (leds[index] != CRGB(0))
-    leds[index] = 0;
+  if (leds[0] == CRGB(0))
+    leds[0] = color;
   else
-    leds[index] = CRGB(0xFFFFFFF);
+    leds[0] = CRGB(0);
   FastLED.show();
-  delay(500);
-  Serial.print(".");
 }
 
 void connectToMqtt()
 {
-  Serial.println("Connecting to MQTT");
+  ledTicker.attach(LED_BLINK_DELAY, blinkLED, CRGB::LimeGreen);
+  Serial.println("Connecting to MQTT.");
   mqttClient.connect();
 }
 
 void onMqttConnect(bool sessionPresent)
 {
+  ledTicker.detach();
   Serial.println("Connected to MQTT.");
-  Serial.print("Session present: ");
-  Serial.println(sessionPresent);
 
   mqttClient.subscribe(cBrightnessSetTopic, 0);
   mqttClient.subscribe(cModeSetTopic, 0);
+
+  mqttClient.publish("wordclock/$localip", 0, true, WiFi.localIP().toString().c_str());
+  mqttClient.publish("wordclock/$mac", 0, true, WiFi.macAddress().c_str());
+
   sendState();
 }
 
@@ -112,7 +117,7 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
   Serial.printf("topic: %s: ", topic);
 
   // THIS IS ONLY FOR SHORT PAYLOADS!!!
-  // payload is in facte byte*, NOT char*!!!
+  // payload is in fact byte*, NOT char*!!!
   if (index == 0)
   {
     std::string value;
@@ -132,19 +137,15 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
 
 void connectToWifi()
 {
-  Serial.println("Connecting to Wi-Fi");
+  ledTicker.attach(LED_BLINK_DELAY, blinkLED, CRGB::Gold);
+  Serial.println("Connecting to Wi-Fi.");
   WiFi.begin(WIFI_SSID, WIFI_PASS);
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    blinkLED(0);
-  }
 }
 
 void onWifiConnect(const WiFiEventStationModeGotIP &event)
 {
-  Serial.println("\r\nConnected to Wi-Fi.");
-  leds[0] = 0;
-  FastLED.show();
+  ledTicker.detach();
+  Serial.println("Connected to Wi-Fi.");
 
   // initialize NTP Client after WiFi is connected
   timeClient.begin();
