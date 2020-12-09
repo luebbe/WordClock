@@ -6,6 +6,7 @@
 #include "TimeHelper.h"
 #include "WordClock.h"
 #include "RainbowAnimation.h"
+#include "ArduinoBorealis.h"
 
 #include "secrets.h"
 
@@ -23,6 +24,7 @@ CRGB *const leds(leds_plus_safety_pixel + 1); // This is the "off-by-one" array 
 
 WordClock wordClock(leds, onGetTime);
 RainbowAnimation rainbowAnimation(leds, MATRIX_WIDTH, MATRIX_HEIGHT);
+BorealisAnimation borealisAnimation(leds, NUM_LEDS);
 
 WiFiEventHandler wifiConnectHandler;
 WiFiEventHandler wifiDisconnectHandler;
@@ -31,7 +33,7 @@ Ticker wifiReconnectTimer;
 AsyncMqttClient mqttClient;
 Ticker mqttReconnectTimer;
 
-uint8_t clockMode = 0;
+uint8_t displayMode = 0;
 bool modeChanged = false;
 
 #define cBrightnessTopic "wordclock/brightness"
@@ -43,7 +45,7 @@ void sendState()
 {
   Serial.println("Send State");
   mqttClient.publish(cBrightnessTopic, 0, true, String(FastLED.getBrightness()).c_str());
-  mqttClient.publish(cModeTopic, 0, true, String(clockMode).c_str());
+  mqttClient.publish(cModeTopic, 0, true, String(displayMode).c_str());
 }
 
 void setBrightness(std::string value)
@@ -57,12 +59,12 @@ void setMode(std::string value)
 {
   Serial.println("Set Mode");
   uint8_t i = atoi(value.c_str());
-  if ((0 <= i) && (i <= 1))
+  if ((0 <= i) && (i <= 255))
   {
-    clockMode = i;
+    displayMode = i;
     modeChanged = true;
     FastLED.clear(true);
-    Serial.printf("=%d\r\n", clockMode);
+    Serial.printf("=%d\r\n", displayMode);
     sendState();
   }
 }
@@ -140,7 +142,7 @@ void connectToWifi()
 
 void onWifiConnect(const WiFiEventStationModeGotIP &event)
 {
-  Serial.println("Connected to Wi-Fi.");
+  Serial.println("\r\nConnected to Wi-Fi.");
   leds[0] = 0;
   FastLED.show();
 
@@ -179,13 +181,16 @@ void setup()
 
 void loop()
 {
-  switch (clockMode)
+  switch (displayMode)
   {
   case 0:
     wordClock.loop(modeChanged);
     break;
   case 1:
     rainbowAnimation.loop(modeChanged);
+    break;
+  case 2:
+    borealisAnimation.loop(modeChanged);
     break;
   default:
     wordClock.loop(modeChanged);
