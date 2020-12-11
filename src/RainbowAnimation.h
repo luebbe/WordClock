@@ -10,7 +10,6 @@
 
 #pragma once
 
-#include <FastLED.h>
 #include "LedMatrix.h"
 
 class RainbowAnimation : public LedMatrix

@@ -3,6 +3,7 @@
 #include <Ticker.h>
 #include <AsyncMqttClient.h>
 
+#include "OtaHelper.h"
 #include "TimeHelper.h"
 #include "WordClock.h"
 #include "RainbowAnimation.h"
@@ -25,6 +26,8 @@ CRGB *const leds(leds_plus_safety_pixel + 1); // This is the "off-by-one" array 
 WordClock wordClock(leds, onGetTime);
 RainbowAnimation rainbowAnimation(leds, MATRIX_WIDTH, MATRIX_HEIGHT);
 BorealisAnimation borealisAnimation(leds, NUM_LEDS);
+
+OtaHelper otaHelper(leds, MATRIX_WIDTH, MATRIX_HEIGHT);
 
 WiFiEventHandler wifiConnectHandler;
 WiFiEventHandler wifiDisconnectHandler;
@@ -81,6 +84,8 @@ void blinkLED(CRGB::HTMLColorCode color)
   FastLED.show();
 }
 
+// MQTT connection and event handling
+
 void connectToMqtt()
 {
   ledTicker.attach(LED_BLINK_DELAY, blinkLED, CRGB::LimeGreen);
@@ -135,6 +140,8 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
   }
 }
 
+// WiFi connection and event handling
+
 void connectToWifi()
 {
   ledTicker.attach(LED_BLINK_DELAY, blinkLED, CRGB::Gold);
@@ -168,6 +175,7 @@ void setup()
 
   wordClock.setup();
   rainbowAnimation.setup();
+  otaHelper.setup();
 
   wifiConnectHandler = WiFi.onStationModeGotIP(onWifiConnect);
   wifiDisconnectHandler = WiFi.onStationModeDisconnected(onWifiDisconnect);
@@ -182,6 +190,8 @@ void setup()
 
 void loop()
 {
+  otaHelper.loop(modeChanged);
+
   switch (displayMode)
   {
   case 0:

@@ -7,7 +7,6 @@
 
 #pragma once
 
-#include <FastLED.h>
 #include "LedMatrix.h"
 
 #define DEBUG
