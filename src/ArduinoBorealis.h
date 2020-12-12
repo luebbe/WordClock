@@ -26,17 +26,17 @@ class BorealisWave
 {
 private:
   //List of colors allowed for waves
-  //The first dimension of this array must match the second dimension of the colorwighting array
-  byte allowedcolors[5][3] = {
-      {17, 177, 13},   //Greenish
-      {148, 242, 5},   //Greenish
-      {25, 173, 121},  //Turquoise
-      {250, 77, 127},  //Pink
-      {171, 101, 221}, //Purple
+  //The dimension of this array must match the second dimension of the colorwighting array
+  CRGB allowedcolors[5] = {
+      CRGB(17, 177, 13),   //Greenish
+      CRGB(148, 242, 5),   //Greenish
+      CRGB(25, 173, 121),  //Turquoise
+      CRGB(250, 77, 127),  //Pink
+      CRGB(171, 101, 221), //Purple
   };
 
   //Colorweighing allows to give some colors more weight so it is more likely to be choosen for a wave.
-  //The second dimension of this array must match the first dimension of the allowedcolors array
+  //The second dimension of this array must match the dimension of the allowedcolors array
   //Here are 3 presets.
   byte colorweighting[3][5] = {
       {10, 10, 10, 10, 10}, //Weighting equal (every color is equally likely)

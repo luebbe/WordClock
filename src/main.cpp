@@ -20,6 +20,8 @@
 
 // Params for width, height and number of extra LEDs are defined in WordClock.h
 #define NUM_LEDS (MATRIX_WIDTH * MATRIX_HEIGHT) + MINUTE_LEDS + SECOND_LEDS
+#define FIRST_MINUTE (MATRIX_WIDTH * MATRIX_HEIGHT)
+
 CRGB leds_plus_safety_pixel[NUM_LEDS + 1];    // The first pixel in this array is the safety pixel for "out of bounds" results. Never use this array directly!
 CRGB *const leds(leds_plus_safety_pixel + 1); // This is the "off-by-one" array that we actually work with and which is passed to FastLED!
 
@@ -77,10 +79,10 @@ void setMode(std::string value)
 
 void blinkLED(CRGB::HTMLColorCode color)
 {
-  if (leds[0] == CRGB(0))
-    leds[0] = color;
+  if (leds[FIRST_MINUTE] == CRGB(0))
+    leds[FIRST_MINUTE] = color;
   else
-    leds[0] = CRGB(0);
+    leds[FIRST_MINUTE] = CRGB(0);
   FastLED.show();
 }
 
@@ -154,9 +156,10 @@ void onWifiConnect(const WiFiEventStationModeGotIP &event)
   ledTicker.detach();
   Serial.println("Connected to Wi-Fi.");
 
+  connectToMqtt();
+
   // initialize NTP Client after WiFi is connected
   timeClient.begin();
-  connectToMqtt();
 }
 
 void onWifiDisconnect(const WiFiEventStationModeDisconnected &event)

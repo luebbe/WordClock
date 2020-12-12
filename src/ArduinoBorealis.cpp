@@ -57,7 +57,7 @@ CRGB *BorealisWave::getColorForLED(int ledIndex)
   }
   else
   {
-    CRGB *rgb = new CRGB();
+    CRGB *rgb = new CRGB(allowedcolors[_basecolor]);
 
     //Offset of this led from center of wave
     //The further away from the center, the dimmer the LED
@@ -76,10 +76,11 @@ CRGB *BorealisWave::getColorForLED(int ledIndex)
       ageFactor = (float)(_ttl - _age) / ((float)_ttl * 0.5);
     }
 
-    //Calculate color based on above factors and basealpha value
-    rgb->r = allowedcolors[_basecolor][0] * (1 - offsetFactor) * ageFactor * _basealpha;
-    rgb->g = allowedcolors[_basecolor][1] * (1 - offsetFactor) * ageFactor * _basealpha;
-    rgb->b = allowedcolors[_basecolor][2] * (1 - offsetFactor) * ageFactor * _basealpha;
+    // Calculate color based on above factors and basealpha value
+    float brightness = (1 - offsetFactor) * ageFactor * _basealpha;
+    rgb->r *= brightness;
+    rgb->g *= brightness;
+    rgb->b *= brightness;
 
     return rgb;
   }
@@ -136,6 +137,10 @@ BorealisAnimation::BorealisAnimation(CRGB *leds, uint16_t numLeds)
 
 void BorealisAnimation::loop(bool forceUpdate)
 {
+  if (forceUpdate)
+  {
+    FastLED.setBrightness(200);
+  }
   DrawWaves();
   FastLED.show();
 }
@@ -178,9 +183,6 @@ void BorealisAnimation::DrawWaves()
 
       delete[] rgb;
     }
-    //##LO    _leds[i] = mixedRgb;
-    _leds[i].r = mixedRgb[0];
-    _leds[i].g = mixedRgb[1];
-    _leds[i].b = mixedRgb[2];
+    _leds[i] = mixedRgb;
   }
 }

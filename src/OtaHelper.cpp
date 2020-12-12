@@ -13,7 +13,8 @@ void OtaHelper::onStart()
 void OtaHelper::onEnd()
 {
   uint8_t y = uint8_t(_height / 2);
-  _matrixLEDs[XYsafe(_width - 1, y)] = CRGB::LimeGreen;
+  for (uint8_t x = 0; x < _width; x++)
+    _matrixLEDs[XY(x, y)] = CRGB::LimeGreen;
   FastLED.show();
 }
 
