@@ -7,8 +7,9 @@
 
 #include "WordClock.h"
 
-WordClock::WordClock(CRGB *leds, TGetTimeFunction onGetTime)
-    : LedMatrix(leds, MATRIX_WIDTH, MATRIX_HEIGHT),
+WordClock::WordClock(const ILedMatrix *ledMatrix, CRGB *leds, uint16_t count, TGetTimeFunction onGetTime)
+    : LedEffect(leds, count),
+      _ledMatrix(ledMatrix),
       _onGetTime(onGetTime),
       _minuteColor(CRGB(0xFF00FF)), // Initial color for the minute LEDs
       _secondColor(CRGB(0x00FFFF)), // Initial color for the second LEDs
@@ -16,28 +17,24 @@ WordClock::WordClock(CRGB *leds, TGetTimeFunction onGetTime)
       _lastUpdate(0)
 {
   _lastWords.clear();
-  _minuteLEDs = (_matrixLEDs + MATRIX_WIDTH * MATRIX_HEIGHT); // Pointer to the start of the buffer for the minute LEDs
-  _secondLEDs = (_minuteLEDs + MINUTE_LEDS);                  // Pointer to the start of the buffer for the second LEDs
+  _minuteLEDs = (_leds + _ledMatrix->getCount()); // Pointer to the start of the buffer for the minute LEDs
+  _secondLEDs = (_minuteLEDs + MINUTE_LEDS);      // Pointer to the start of the buffer for the second LEDs
 }
 
-void WordClock::setup()
+void WordClock::init()
 {
-  LedMatrix::setup();
-
   memset8(_minuteLEDs, 0, sizeof(struct CRGB) * MINUTE_LEDS);
   memset8(_secondLEDs, 0, sizeof(struct CRGB) * SECOND_LEDS);
 }
 
-void WordClock::loop(bool forceUpdate)
+bool WordClock::paint(bool force)
 {
-  LedMatrix::loop(forceUpdate);
-
   ulong now = millis();
-  if (forceUpdate || (now - _lastUpdate >= 1000UL) || (_lastUpdate == 0))
+  if ((now - _lastUpdate >= 1000UL) || (_lastUpdate == 0))
   {
     _lastUpdate = now;
 
-    if (forceUpdate)
+    if (force)
     {
       _lastWords.clear();
     }
@@ -54,9 +51,10 @@ void WordClock::loop(bool forceUpdate)
       updateHours(hours, minutes);
       updateMinutes(minutes);
       updateSeconds(seconds);
-      FastLED.show();
+      return true;
     }
   }
+  return false;
 }
 
 void WordClock::adjustTime(int &hours, int &minutes, int &seconds)
@@ -227,7 +225,7 @@ void WordClock::updateHours(int &hours, int &minutes)
 #ifdef DEBUG
     Serial.printf("Sending %d words:", currentWords.size());
 #endif
-    clearAll();
+    memset8(_leds, 0, sizeof(struct CRGB) * _ledMatrix->getCount());
     for (size_t i = 0; i < currentWords.size(); i++)
     {
       sendWord(currentWords[i]);
@@ -298,6 +296,6 @@ void WordClock::sendWord(uint8_t index)
   CRGB actcolor = randomRGB();
   for (int j = 0; j < TLEDS[index].len; j++)
   {
-    _matrixLEDs[XY(TLEDS[index].x + j, TLEDS[index].y)] = actcolor;
+    _leds[_ledMatrix->toStrip(TLEDS[index].x + j, TLEDS[index].y)] = actcolor;
   }
 }

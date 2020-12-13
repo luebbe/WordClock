@@ -1,7 +1,7 @@
 #include "OtaHelper.h"
 
-OtaHelper::OtaHelper(CRGB *leds, uint8_t width, uint8_t height, bool serpentineLayout, bool vertical)
-    : LedMatrix(leds, width, height, serpentineLayout, vertical)
+OtaHelper::OtaHelper(const ILedMatrix *ledMatrix, CRGB * leds, uint16_t count)
+    : LedEffect(leds, count), _ledMatrix(ledMatrix)
 {
 }
 
@@ -12,9 +12,9 @@ void OtaHelper::onStart()
 
 void OtaHelper::onEnd()
 {
-  uint8_t y = uint8_t(_height / 2);
-  for (uint8_t x = 0; x < _width; x++)
-    _matrixLEDs[XY(x, y)] = CRGB::LimeGreen;
+  uint8_t y = uint8_t(_ledMatrix->getHeight() / 2);
+  for (uint8_t x = 0; x < _ledMatrix->getWidth(); x++)
+    _leds[_ledMatrix->toStrip(x, y)] = CRGB::LimeGreen;
   FastLED.show();
 }
 
@@ -48,20 +48,20 @@ void OtaHelper::onError(ota_error_t error)
 
 void OtaHelper::onProgress(unsigned int progress, unsigned int total)
 {
-  float_t curProgress = float_t(progress * _width) / total;
+  float_t curProgress = float_t(progress * _ledMatrix->getWidth()) / total;
   uint8_t brightness = int(curProgress * 256) % 256;
   uint8_t x = uint8_t(curProgress);
-  uint8_t y = uint8_t(_height / 2);
+  uint8_t y = uint8_t(_ledMatrix->getHeight() / 2);
 
   // 100% would lead to overflow
-  if (x < _width)
+  if (x < _ledMatrix->getWidth())
   {
-    _matrixLEDs[XY(x, y)] = CHSV(220, 100, brightness);
+    _leds[_ledMatrix->toStrip(x, y)] = CHSV(220, 100, brightness);
   }
   FastLED.show();
 }
 
-void OtaHelper::setup()
+void OtaHelper::init()
 {
   ArduinoOTA.onStart([this]() {
     onStart();
@@ -82,7 +82,7 @@ void OtaHelper::setup()
   ArduinoOTA.begin();
 }
 
-void OtaHelper::loop(bool forceUpdate)
+bool OtaHelper::paint(bool force)
 {
-  ArduinoOTA.handle();
+  return false;
 }

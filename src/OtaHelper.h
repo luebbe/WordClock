@@ -1,19 +1,22 @@
 #pragma once
 
 #include <ArduinoOTA.h>
+#include "LedEffect.h"
 #include "LedMatrix.h"
 
-class OtaHelper : public LedMatrix
+class OtaHelper : public LedEffect
 {
 private:
-    void onStart();
-    void onEnd();
-    void onError(ota_error_t error);
-    void onProgress(unsigned int progress, unsigned int total);
+  const ILedMatrix *_ledMatrix;
+
+  void onStart();
+  void onEnd();
+  void onError(ota_error_t error);
+  void onProgress(unsigned int progress, unsigned int total);
 
 public:
-    explicit OtaHelper(CRGB *leds, uint8_t width, uint8_t height, bool sepentineLayout = true, bool vertical = false);
+  explicit OtaHelper(const ILedMatrix *ledMatrix, CRGB *leds, uint16_t count);
 
-    virtual void loop(bool forceUpdate) override;
-    virtual void setup() override;
+  void init() override;
+  bool paint(bool force) override;
 };

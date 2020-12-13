@@ -7,17 +7,13 @@
 
 #pragma once
 
+#include "LedEffect.h"
 #include "LedMatrix.h"
 
 #define DEBUG
 
 // The data flow through this word clock is the following:
 // INPUT -> Matrix LEDs -> Minute LEDs -> Second LEDs (-> Other LEDs).
-
-// LED matrix of 11x10 pixels with 0,0 at the bottom left
-// The matrix has to be the *first* section of the LED chain, because of the "safety pixel"
-#define MATRIX_WIDTH 11
-#define MATRIX_HEIGHT 10
 
 // Uncomment the following line if you have LEDs for the minutes *after* the matrix
 #define HAS_MINUTES
@@ -48,10 +44,12 @@
 
 typedef std::function<bool(int &hours, int &minutes, int &seconds)> TGetTimeFunction;
 
-class WordClock : public LedMatrix
+class WordClock : public LedEffect
 {
 private:
   typedef std::vector<uint8_t> TWORDBUF;
+
+  const ILedMatrix *_ledMatrix;
 
   TGetTimeFunction _onGetTime;
   CRGB _minuteColor;      // Color for the minute LEDs
@@ -69,16 +67,16 @@ private:
   void adjustTime(int &hours, int &minutes, int &seconds);
   void createWords(TWORDBUF &currentWords, int &currentHour, int &currentMinute);
   void sendWord(uint8_t index);
-  
+
   void updateHours(int &hours, int &minutes);
   void updateMinutes(int &minutes);
   void updateSeconds(int &seconds);
 
 public:
-  explicit WordClock(CRGB *leds, TGetTimeFunction onGetTime);
+  explicit WordClock(const ILedMatrix *ledMatrix, CRGB *leds, uint16_t count, TGetTimeFunction onGetTime);
 
-  virtual void loop(bool forceUpdate) override;
-  virtual void setup() override;
+  void init() override;
+  bool paint(bool force) override;
 
   void setUseThreeQuarters(bool value) { _useThreeQuarters = value; }
 };

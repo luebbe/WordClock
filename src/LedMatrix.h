@@ -12,7 +12,16 @@
 
 #pragma once
 
-#include <FastLED.h>
+#include "Arduino.h"
+
+class ILedMatrix
+{
+public:
+  virtual uint8_t getWidth() const = 0;
+  virtual uint8_t getHeight() const = 0;
+  virtual uint16_t getCount() const = 0;
+  virtual int16_t toStrip(uint8_t x, uint8_t y) const = 0;
+};
 
 // Set 'serpentineLayout' to false if your pixels are
 // laid out all running the same way, like this:
@@ -49,15 +58,13 @@
 // in one row, and then backwards in the next row, and so on
 // is call "boustrophedon", meaning "as the ox plows."
 
-class LedMatrix
+class LedMatrix : public ILedMatrix
 {
-protected:
-  CRGB *_matrixLEDs;
+private:
   uint8_t _width;
   uint8_t _height;
   bool _serpentineLayout;
   bool _vertical;
-  uint8_t _brightness;
 
   // This function will return the right 'led index number' for
   // a given set of X and Y coordinates on your matrix.
@@ -76,8 +83,53 @@ protected:
   //    }
   //
   //
-  uint16_t XY(uint8_t x, uint8_t y);
+  int16_t XY(uint8_t x, uint8_t y) const 
+  {
+    int16_t i;
 
+    if (_serpentineLayout == false)
+    {
+      if (_vertical == false)
+      {
+        i = (y * _width) + x;
+      }
+      else
+      {
+        i = _height * (_width - (x + 1)) + y;
+      }
+    }
+
+    if (_serpentineLayout == true)
+    {
+      if (_vertical == false)
+      {
+        if (y & 0x01)
+        {
+          // Odd rows run backwards
+          uint8_t reverseX = (_width - 1) - x;
+          i = (y * _width) + reverseX;
+        }
+        else
+        {
+          // Even rows run forwards
+          i = (y * _width) + x;
+        }
+      }
+      else
+      { // vertical positioning
+        if (x & 0x01)
+        {
+          i = _height * (_width - (x + 1)) + y;
+        }
+        else
+        {
+          i = _height * (_width - x) - (y + 1);
+        }
+      }
+    }
+
+    return i;
+  }
   // Once you've gotten the basics working (AND NOT UNTIL THEN!)
   // here's a helpful technique that can be tricky to set up, but
   // then helps you avoid the needs for sprinkling array-bound-checking
@@ -111,7 +163,7 @@ protected:
   // there is hidden from view automatically.
   // Thus, this line of code is totally safe, regardless of the actual size of
   // your matrix:
-  //    leds[ XYsafe( random8(), random8() ) ] = CHSV( random8(), 255, 255);
+  //    leds[ XYSafe( random8(), random8() ) ] = CHSV( random8(), 255, 255);
   //
   // The only catch here is that while this makes it safe to read from and
   // write to 'any pixel', there's really only ONE 'safety pixel'.  No matter
@@ -119,20 +171,21 @@ protected:
   // that one safety pixel.  And if you try to READ from the safety pixel,
   // you'll read whatever was written there last, reglardless of what coordinates
   // were supplied.
-  uint16_t XYsafe(uint8_t x, uint8_t y);
+  int16_t XYSafe(uint8_t x, uint8_t y) const 
+  {
+    if (x >= _width)
+      return -1;
+    if (y >= _height)
+      return -1;
+    return XY(x, y);
+  }
 
 public:
-  explicit LedMatrix(CRGB *leds, uint8_t width, uint8_t height, bool sepentineLayout = true, bool vertical = false);
+  explicit LedMatrix(uint8_t width, uint8_t height, bool serpentineLayout = true, bool vertical = false)
+      : _width(width), _height(height), _serpentineLayout(serpentineLayout), _vertical(vertical) {}
 
-  virtual void loop(bool forceUpdate);
-  virtual void setup();
-
-  void clearAll();
-  void scrollLeft();
-  void scrollRight();
-  void scrollUp();
-  void scrollDown();
-
-  uint8_t getBrightness();
-  void setBrightness(uint8_t value);
+  uint8_t getWidth() const { return _width; }
+  uint8_t getHeight() const { return _height; }
+  uint16_t getCount() const { return _width * _height; }
+  int16_t toStrip(uint8_t x, uint8_t y) const { return XYSafe(x, y); }
 };

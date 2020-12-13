@@ -10,33 +10,31 @@
 
 #include "RainbowAnimation.h"
 
-RainbowAnimation::RainbowAnimation(CRGB *leds, uint8_t width, uint8_t height, bool serpentineLayout, bool vertical)
-    : LedMatrix(leds, width, height, serpentineLayout, vertical)
+RainbowAnimation::RainbowAnimation(const ILedMatrix *ledMatrix, CRGB * leds, uint16_t count)
+    : LedEffect(leds, count), _ledMatrix(ledMatrix)
 {
 }
 
-void RainbowAnimation::loop(bool forceUpdate)
+bool RainbowAnimation::paint(bool force)
 {
-  LedMatrix::loop(forceUpdate);
-
   uint32_t ms = millis();
-  int32_t yHueDelta32 = ((int32_t)cos16(ms * (27 / 1)) * (350 / _width));
-  int32_t xHueDelta32 = ((int32_t)cos16(ms * (39 / 1)) * (310 / _height));
+  int32_t yHueDelta32 = ((int32_t)cos16(ms * (27 / 1)) * (350 / _ledMatrix->getWidth()));
+  int32_t xHueDelta32 = ((int32_t)cos16(ms * (39 / 1)) * (310 / _ledMatrix->getHeight()));
   DrawOneFrame(ms / 65536, yHueDelta32 / 32768, xHueDelta32 / 32768);
-  FastLED.show();
+  return true;
 }
 
 void RainbowAnimation::DrawOneFrame(byte startHue8, int8_t yHueDelta8, int8_t xHueDelta8)
 {
   byte lineStartHue = startHue8;
-  for (byte y = 0; y < _height; y++)
+  for (byte y = 0; y < _ledMatrix->getHeight(); y++)
   {
     lineStartHue += yHueDelta8;
     byte pixelHue = lineStartHue;
-    for (byte x = 0; x < _width; x++)
+    for (byte x = 0; x < _ledMatrix->getWidth(); x++)
     {
       pixelHue += xHueDelta8;
-      _matrixLEDs[XY(x, y)] = CHSV(pixelHue, 255, 255);
+      _leds[_ledMatrix->toStrip(x, y)] = CHSV(pixelHue, 255, 255);
     }
   }
 }

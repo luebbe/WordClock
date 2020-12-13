@@ -16,6 +16,11 @@
 #define COLOR_ORDER GRB
 #define CHIPSET WS2812
 
+// LED matrix of 11x10 pixels with 0,0 at the bottom left
+// The matrix has to be the *first* section of the LED chain, because of the "safety pixel"
+#define MATRIX_WIDTH 11
+#define MATRIX_HEIGHT 10
+
 #define BRIGHTNESS 20
 
 // Params for width, height and number of extra LEDs are defined in WordClock.h
@@ -25,11 +30,13 @@
 CRGB leds_plus_safety_pixel[NUM_LEDS + 1];    // The first pixel in this array is the safety pixel for "out of bounds" results. Never use this array directly!
 CRGB *const leds(leds_plus_safety_pixel + 1); // This is the "off-by-one" array that we actually work with and which is passed to FastLED!
 
-WordClock wordClock(leds, onGetTime);
-RainbowAnimation rainbowAnimation(leds, MATRIX_WIDTH, MATRIX_HEIGHT);
-BorealisAnimation borealisAnimation(leds, NUM_LEDS);
+LedMatrix ledMatrix(MATRIX_WIDTH, MATRIX_HEIGHT);
+LedEffect *ledEffect = nullptr;
 
-OtaHelper otaHelper(leds, MATRIX_WIDTH, MATRIX_HEIGHT);
+OtaHelper otaHelper(&ledMatrix, leds, NUM_LEDS);
+WordClock wordClock(&ledMatrix, leds, NUM_LEDS, onGetTime);
+RainbowAnimation rainbowAnimation(&ledMatrix, leds, NUM_LEDS);
+BorealisAnimation borealisAnimation(&ledMatrix, leds, NUM_LEDS);
 
 WiFiEventHandler wifiConnectHandler;
 WiFiEventHandler wifiDisconnectHandler;
@@ -67,12 +74,26 @@ void setMode(std::string value)
 {
   Serial.println("Set Mode");
   uint8_t i = atoi(value.c_str());
-  if ((0 <= i) && (i <= 255))
+  if ((0 <= i) && (i <= 255) && (i != displayMode))
   {
     displayMode = i;
     modeChanged = true;
     FastLED.clear(true);
     Serial.printf("=%d\r\n", displayMode);
+    switch (displayMode)
+    {
+    case 0:
+      ledEffect = &wordClock;
+      break;
+    case 1:
+      ledEffect = &rainbowAnimation;
+      break;
+    case 2:
+      ledEffect = &borealisAnimation;
+      break;
+    default:
+      ledEffect = &wordClock;
+    }
     sendState();
   }
 }
@@ -172,13 +193,17 @@ void onWifiDisconnect(const WiFiEventStationModeDisconnected &event)
 void setup()
 {
   Serial.begin(SERIAL_SPEED);
+  Serial.println();
+  Serial.println();
 
   FastLED.addLeds<CHIPSET, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
   FastLED.setBrightness(BRIGHTNESS);
 
-  wordClock.setup();
-  rainbowAnimation.setup();
-  otaHelper.setup();
+  ledEffect = &wordClock;
+
+  otaHelper.init();
+  wordClock.init();
+  rainbowAnimation.init();
 
   wifiConnectHandler = WiFi.onStationModeGotIP(onWifiConnect);
   wifiDisconnectHandler = WiFi.onStationModeDisconnected(onWifiDisconnect);
@@ -193,21 +218,11 @@ void setup()
 
 void loop()
 {
-  otaHelper.loop(modeChanged);
+  ArduinoOTA.handle();
 
-  switch (displayMode)
+  if (ledEffect && ledEffect->paint(modeChanged))
   {
-  case 0:
-    wordClock.loop(modeChanged);
-    break;
-  case 1:
-    rainbowAnimation.loop(modeChanged);
-    break;
-  case 2:
-    borealisAnimation.loop(modeChanged);
-    break;
-  default:
-    wordClock.loop(modeChanged);
+    FastLED.show();
+    modeChanged = false;
   }
-  modeChanged = false;
 }

@@ -10,15 +10,19 @@
 
 #pragma once
 
+#include "LedEffect.h"
 #include "LedMatrix.h"
 
-class RainbowAnimation : public LedMatrix
+class RainbowAnimation : public LedEffect
 {
 private:
+  const ILedMatrix *_ledMatrix;
+
   void DrawOneFrame(byte startHue8, int8_t yHueDelta8, int8_t xHueDelta8);
 
 public:
-  explicit RainbowAnimation(CRGB *leds, uint8_t width, uint8_t height, bool sepentineLayout = true, bool vertical = false);
+  explicit RainbowAnimation(const ILedMatrix *ledMatrix, CRGB *leds, uint16_t count);
 
-  virtual void loop(bool forceUpdate) override;
+  void init(){};
+  bool paint(bool force) override;
 };

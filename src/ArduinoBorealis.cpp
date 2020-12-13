@@ -124,8 +124,9 @@ void BorealisWave::update()
 
 // ---------- BorealisAnimation ----------
 
-BorealisAnimation::BorealisAnimation(CRGB *leds, uint16_t numLeds)
-    : _leds(leds), _numLeds(numLeds)
+BorealisAnimation::BorealisAnimation(const ILedMatrix *ledMatrix, CRGB *leds, uint16_t count)
+    : LedEffect(leds, count)
+    // , _ledMatrix(ledMatrix)
 {
   randomSeed(W_RANDOM_SEED);
   //Initial creating of waves
@@ -135,14 +136,10 @@ BorealisAnimation::BorealisAnimation(CRGB *leds, uint16_t numLeds)
   }
 }
 
-void BorealisAnimation::loop(bool forceUpdate)
+bool BorealisAnimation::paint(bool force)
 {
-  if (forceUpdate)
-  {
-    FastLED.setBrightness(200);
-  }
   DrawWaves();
-  FastLED.show();
+  return true;
 }
 
 void BorealisAnimation::DrawWaves()

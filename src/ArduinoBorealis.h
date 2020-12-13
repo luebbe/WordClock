@@ -10,6 +10,7 @@
 
 #pragma once
 
+#include "LedEffect.h"
 #include "LedMatrix.h"
 
 // LED CONFIG
@@ -68,17 +69,16 @@ public:
   bool stillAlive() { return _alive; };
 };
 
-class BorealisAnimation
+class BorealisAnimation : public LedEffect
 {
 private:
-  CRGB *_leds;
-  uint16_t _numLeds;
+  // const ILedMatrix *_ledMatrix;
   BorealisWave *waves[W_COUNT];
 
   void DrawWaves();
 
 public:
-  explicit BorealisAnimation(CRGB *leds, uint16_t numLeds);
+  explicit BorealisAnimation(const ILedMatrix *ledMatrix, CRGB *leds, uint16_t count);
 
-  void loop(bool forceUpdate);
+  bool paint(bool force);
 };
