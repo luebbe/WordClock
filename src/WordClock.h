@@ -62,8 +62,6 @@ private:
 
   TWORDBUF _lastWords; // Buffer for the last words that have been sent to the matrix
 
-  CRGB randomRGB(); // For now just random RGB colors. May become a time based effect or fancy rainbow/lookup table in the future
-
   void adjustTime(int &hours, int &minutes, int &seconds);
   void createWords(TWORDBUF &currentWords, int &currentHour, int &currentMinute);
   void sendWord(uint8_t index);

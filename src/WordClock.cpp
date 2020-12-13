@@ -246,7 +246,7 @@ void WordClock::updateMinutes(int &minutes)
   {
     // Erase buffer in minute 0 of 5 and pick a color for all minute LEDs
     memset8(_minuteLEDs, 0, sizeof(struct CRGB) * MINUTE_LEDS);
-    _minuteColor = randomRGB();
+    _minuteColor = getRandomColor();
   }
   else
   {
@@ -268,7 +268,7 @@ void WordClock::updateSeconds(int &seconds)
   if (secondIndex == 0)
   {
     memset8(_secondLEDs, 0, sizeof(struct CRGB) * SECOND_LEDS);
-    _secondColor = randomRGB();
+    _secondColor = getRandomColor();
   }
 
   // Now add the offset for the "real" LED number zero
@@ -279,12 +279,6 @@ void WordClock::updateSeconds(int &seconds)
 #endif
 }
 
-CRGB WordClock::randomRGB()
-{
-  // If we're unlucky, we'll get an almost invisible colour
-  return CRGB(random(1, 0xFFFFFF));
-}
-
 void WordClock::sendWord(uint8_t index)
 {
 #ifdef DEBUG
@@ -293,7 +287,7 @@ void WordClock::sendWord(uint8_t index)
   Serial.printf(" %d=%s", index, buffer);
 #endif
 
-  CRGB actcolor = randomRGB();
+  CRGB actcolor = getRandomColor();
   for (int j = 0; j < TLEDS[index].len; j++)
   {
     _leds[_ledMatrix->toStrip(TLEDS[index].x + j, TLEDS[index].y)] = actcolor;
