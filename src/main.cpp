@@ -59,8 +59,8 @@ bool modeChanged = false;
 void sendState()
 {
   Serial.println("Send State");
-  mqttClient.publish(cBrightnessTopic, 0, true, String(FastLED.getBrightness()).c_str());
-  mqttClient.publish(cModeTopic, 0, true, String(displayMode).c_str());
+  mqttClient.publish(cBrightnessTopic, 1, true, String(FastLED.getBrightness()).c_str());
+  mqttClient.publish(cModeTopic, 1, true, String(displayMode).c_str());
 }
 
 void setBrightness(std::string value)
@@ -121,13 +121,15 @@ void onMqttConnect(bool sessionPresent)
   ledTicker.detach();
   Serial.println("Connected to MQTT.");
 
-  mqttClient.subscribe(cBrightnessSetTopic, 0);
-  mqttClient.subscribe(cModeSetTopic, 0);
+  mqttClient.subscribe(cBrightnessSetTopic, 1);
+  mqttClient.subscribe(cModeSetTopic, 1);
 
-  mqttClient.publish("wordclock/$localip", 0, true, WiFi.localIP().toString().c_str());
-  mqttClient.publish("wordclock/$mac", 0, true, WiFi.macAddress().c_str());
+  mqttClient.publish("wordclock/$localip", 1, true, WiFi.localIP().toString().c_str());
+  mqttClient.publish("wordclock/$mac", 1, true, WiFi.macAddress().c_str());
+  mqttClient.publish("wordclock/$state", 1, true, "ready");
 
   sendState();
+
 }
 
 void onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
@@ -136,6 +138,7 @@ void onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
 
   if (WiFi.isConnected())
   {
+    ledTicker.attach(LED_BLINK_DELAY, blinkLED, CRGB::LimeGreen);
     mqttReconnectTimer.once(2, connectToMqtt);
   }
 }
@@ -212,6 +215,7 @@ void setup()
   mqttClient.onDisconnect(onMqttDisconnect);
   mqttClient.onMessage(onMqttMessage);
   mqttClient.setServer(MQTT_HOST, MQTT_PORT);
+  mqttClient.setWill("wordclock/$state", 1, true, "lost");
 
   connectToWifi();
 }
