@@ -1,5 +1,9 @@
 # WordClock
 
+[![Languages](https://img.shields.io/github/languages/top/luebbe/WordClock.svg?style=flat-square)](https://img.shields.io/github/languages/top/luebbe/WordClock)
+[![Codacy](https://img.shields.io/codacy/grade/e6d5e648b83b4667b399b81e2986dea6?style=flat-square)](https://app.codacy.com/gh/luebbe/WordClock/dashboard)
+[![License](https://img.shields.io/github/license/mashape/apistatus.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+
 An ESP8266 based Word Clock built with PlatformIO that fetches the time from a NTP server.
 
 This is firmware for the 11x10 LED Matrix word clock case from [WordClock 12h (desk clock edition) from Thingiverse](https://www.thingiverse.com/thing:2130830).
@@ -16,7 +20,6 @@ The modes and brightness can be set via mqtt by writing to the following mqtt to
 - `wordclock/mode/set` (0..2)
 
 When the word clock is powered up, it starts in mode 0 (word clock) with brightness 20.
-
 The word clock reports its state via the following mqtt topics:
 
 - `wordclock/$localip` - the ip address assigned to the word clodk
