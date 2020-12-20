@@ -53,7 +53,7 @@ void OtaHelper::onProgress(unsigned int progress, unsigned int total)
   uint8_t x = uint8_t(curProgress);
   uint8_t y = uint8_t(_ledMatrix->getHeight() / 2);
 
-  // 100% would lead to overflow
+  // 100% would lead to overflow, just draw the bar until 99%
   if (x < _ledMatrix->getWidth())
   {
     _leds[_ledMatrix->toStrip(x, y)] = CHSV(220, 100, brightness);

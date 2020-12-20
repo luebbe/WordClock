@@ -33,3 +33,39 @@ bool onGetTime(int &hours, int &minutes, int &seconds)
     return false;
   }
 }
+
+class Uptime
+{
+public:
+  Uptime();
+  void reset();
+  void update();
+  uint64_t getSeconds() const;
+
+private:
+  uint64_t _milliseconds;
+  uint32_t _lastTick;
+};
+
+Uptime::Uptime()
+    : _milliseconds(0), _lastTick(0)
+{
+}
+
+void Uptime::reset()
+{
+  _milliseconds = 0;
+  _lastTick = millis();
+}
+
+void Uptime::update()
+{
+  uint32_t now = millis();
+  _milliseconds += (now - _lastTick);
+  _lastTick = now;
+}
+
+uint64_t Uptime::getSeconds() const
+{
+  return (_milliseconds / 1000ULL);
+}

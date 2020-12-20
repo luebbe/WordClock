@@ -11,6 +11,8 @@
 
 #include "secrets.h"
 
+// #define DEBUG
+
 #define LED_PIN 5 // D1 on D1 Mini
 
 #define COLOR_ORDER GRB
@@ -50,17 +52,61 @@ const float LED_BLINK_DELAY = 0.5;
 
 uint8_t displayMode = 0;
 bool modeChanged = false;
+ulong _lastUpdate = 0;
 
-#define cBrightnessTopic "wordclock/brightness"
-#define cBrightnessSetTopic "wordclock/brightness/set"
-#define cModeTopic "wordclock/mode"
-#define cModeSetTopic "wordclock/mode/set"
+Uptime _uptime;
+Uptime _uptimeMqtt;
+Uptime _uptimeWifi;
+
+#ifdef DEBUG
+#define cMqttPrefix "wordclockdebug/"
+#else
+#define cMqttPrefix "wordclock/"
+#endif
+
+// Status
+#define cIpTopic cMqttPrefix "$localip"
+#define cMacTopic cMqttPrefix "$mac"
+#define cStateTopic cMqttPrefix "$state"
+
+// Statistics
+#define cStatsTopic cMqttPrefix "$stats/"
+#define cSignalTopic cStatsTopic "signal"
+#define cHeapTopic cStatsTopic "heap"
+#define cUptimeTopic cStatsTopic "uptime"
+#define cUptimeWifiTopic cStatsTopic "uptimewifi"
+#define cUptimeMqttTopic cStatsTopic "uptimemqtt"
+
+// Operation mode
+#define cBrightnessTopic cMqttPrefix "brightness"
+#define cBrightnessSetTopic cMqttPrefix "brightness/set"
+#define cModeTopic cMqttPrefix "mode"
+#define cModeSetTopic cMqttPrefix "mode/set"
 
 void sendState()
 {
-  Serial.println("Send State");
+  Serial.println("Sending State");
   mqttClient.publish(cBrightnessTopic, 1, true, String(FastLED.getBrightness()).c_str());
   mqttClient.publish(cModeTopic, 1, true, String(displayMode).c_str());
+}
+
+void sendStats()
+{
+  Serial.println("Sending Statistics");
+
+  mqttClient.publish(cSignalTopic, 1, true, String(WiFi.RSSI()).c_str());
+  mqttClient.publish(cHeapTopic, 1, true, String(ESP.getFreeHeap()).c_str());
+
+  _uptime.update();
+  _uptimeWifi.update();
+  _uptimeMqtt.update();
+  char statusStr[20 + 1];
+  itoa(_uptime.getSeconds(), statusStr, 10);
+  mqttClient.publish(cUptimeTopic, 1, true, statusStr);
+  itoa(_uptimeWifi.getSeconds(), statusStr, 10);
+  mqttClient.publish(cUptimeWifiTopic, 1, true, statusStr);
+  itoa(_uptimeMqtt.getSeconds(), statusStr, 10);
+  mqttClient.publish(cUptimeMqttTopic, 1, true, statusStr);
 }
 
 void setBrightness(std::string value)
@@ -124,12 +170,11 @@ void onMqttConnect(bool sessionPresent)
   mqttClient.subscribe(cBrightnessSetTopic, 1);
   mqttClient.subscribe(cModeSetTopic, 1);
 
-  mqttClient.publish("wordclock/$localip", 1, true, WiFi.localIP().toString().c_str());
-  mqttClient.publish("wordclock/$mac", 1, true, WiFi.macAddress().c_str());
-  mqttClient.publish("wordclock/$state", 1, true, "ready");
+  mqttClient.publish(cIpTopic, 1, true, WiFi.localIP().toString().c_str());
+  mqttClient.publish(cMacTopic, 1, true, WiFi.macAddress().c_str());
+  mqttClient.publish(cStateTopic, 1, true, "ready");
 
   sendState();
-
 }
 
 void onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
@@ -179,6 +224,7 @@ void onWifiConnect(const WiFiEventStationModeGotIP &event)
 {
   ledTicker.detach();
   Serial.println("Connected to Wi-Fi.");
+  _uptimeWifi.reset();
 
   connectToMqtt();
 
@@ -201,12 +247,12 @@ void setup()
 
   FastLED.addLeds<CHIPSET, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
   FastLED.setBrightness(BRIGHTNESS);
+  FastLED.clear(true);
 
   ledEffect = &wordClock;
 
   otaHelper.init();
   wordClock.init();
-  rainbowAnimation.init();
 
   wifiConnectHandler = WiFi.onStationModeGotIP(onWifiConnect);
   wifiDisconnectHandler = WiFi.onStationModeDisconnected(onWifiDisconnect);
@@ -215,18 +261,29 @@ void setup()
   mqttClient.onDisconnect(onMqttDisconnect);
   mqttClient.onMessage(onMqttMessage);
   mqttClient.setServer(MQTT_HOST, MQTT_PORT);
-  mqttClient.setWill("wordclock/$state", 1, true, "lost");
+  mqttClient.setWill(cStateTopic, 1, true, "lost");
 
+  _uptime.reset();
   connectToWifi();
 }
 
 void loop()
 {
-  ArduinoOTA.handle();
-
   if (ledEffect && ledEffect->paint(modeChanged))
   {
     FastLED.show();
     modeChanged = false;
+  }
+
+  if (WiFi.isConnected())
+  {
+    if (mqttClient.connected())
+      if ((millis() - _lastUpdate >= 60000UL) || (_lastUpdate == 0))
+      {
+        sendStats();
+        _lastUpdate = millis();
+}
+
+    ArduinoOTA.handle();
   }
 }

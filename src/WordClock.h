@@ -10,7 +10,7 @@
 #include "LedEffect.h"
 #include "LedMatrix.h"
 
-#define DEBUG
+// #define DEBUG
 
 // The data flow through this word clock is the following:
 // INPUT -> Matrix LEDs -> Minute LEDs -> Second LEDs (-> Other LEDs).
