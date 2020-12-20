@@ -57,8 +57,6 @@ CRGB *BorealisWave::getColorForLED(int ledIndex)
   }
   else
   {
-    CRGB *rgb = new CRGB(allowedcolors[_basecolor]);
-
     //Offset of this led from center of wave
     //The further away from the center, the dimmer the LED
     int offset = abs(ledIndex - _center);
@@ -78,6 +76,7 @@ CRGB *BorealisWave::getColorForLED(int ledIndex)
 
     // Calculate color based on above factors and basealpha value
     float brightness = (1 - offsetFactor) * ageFactor * _basealpha;
+    CRGB *rgb = new CRGB(allowedcolors[_basecolor]);
     rgb->r *= brightness;
     rgb->g *= brightness;
     rgb->b *= brightness;
