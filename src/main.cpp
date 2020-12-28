@@ -14,6 +14,8 @@
 #include "secrets.h"
 
 // #define DEBUG
+#define FW_NAME "Word Clock"
+#define FW_VERSION "1.0.0"
 
 #define LED_PIN 5 // D1 on D1 Mini
 
@@ -69,6 +71,9 @@ Uptime _uptimeWifi;
 #define cIpTopic cMqttPrefix "$localip"
 #define cMacTopic cMqttPrefix "$mac"
 #define cStateTopic cMqttPrefix "$state"
+#define cFirmwareTopic cMqttPrefix "$fw/"
+#define cFirmwareName cFirmwareTopic "name"
+#define cFirmnwareVersion cFirmwareTopic "version"
 
 // Statistics
 #define cStatsTopic cMqttPrefix "$stats/"
@@ -174,6 +179,9 @@ void onMqttConnect(bool sessionPresent)
 
   mqttClient.subscribe(cBrightnessSetTopic, 1);
   mqttClient.subscribe(cModeSetTopic, 1);
+
+  mqttClient.publish(cFirmwareName, 1, true, FW_NAME);
+  mqttClient.publish(cFirmnwareVersion, 1, true, FW_VERSION);
 
   mqttClient.publish(cIpTopic, 1, true, WiFi.localIP().toString().c_str());
   mqttClient.publish(cMacTopic, 1, true, WiFi.macAddress().c_str());
