@@ -10,6 +10,7 @@
 #include "RainbowAnimation.h"
 #include "ArduinoBorealis.h"
 
+#include "debugutils.h"
 #include "secrets.h"
 
 // #define DEBUG
@@ -85,14 +86,15 @@ Uptime _uptimeWifi;
 
 void sendState()
 {
-  Serial.println("Sending State");
+  DEBUG_PRINTLN("Sending State");
+
   mqttClient.publish(cBrightnessTopic, 1, true, String(FastLED.getBrightness()).c_str());
   mqttClient.publish(cModeTopic, 1, true, String(displayMode).c_str());
 }
 
 void sendStats()
 {
-  Serial.println("Sending Statistics");
+  DEBUG_PRINTLN("Sending Statistics");
 
   mqttClient.publish(cSignalTopic, 1, true, String(WiFi.RSSI()).c_str());
   mqttClient.publish(cHeapTopic, 1, true, String(ESP.getFreeHeap()).c_str());
@@ -118,14 +120,17 @@ void setBrightness(std::string value)
 
 void setMode(std::string value)
 {
-  Serial.println("Set Mode");
+  DEBUG_PRINTLN("Set Mode");
+
   uint8_t i = atoi(value.c_str());
   if ((0 <= i) && (i <= 255) && (i != displayMode))
   {
     displayMode = i;
     modeChanged = true;
     FastLED.clear(true);
-    Serial.printf("=%d\r\n", displayMode);
+
+    DEBUG_PRINTF("=%d\r\n", displayMode);
+
     switch (displayMode)
     {
     case 0:
@@ -151,7 +156,8 @@ void setMode(std::string value)
 
 void connectToMqtt()
 {
-  Serial.println("Connecting to MQTT.");
+  DEBUG_PRINTLN("Connecting to MQTT.");
+
   connectingAnimation.setHue(192);
   ledEffect = &connectingAnimation;
   mqttClient.connect();
@@ -159,7 +165,8 @@ void connectToMqtt()
 
 void onMqttConnect(bool sessionPresent)
 {
-  Serial.println("Connected to MQTT.");
+  DEBUG_PRINTLN("Connected to MQTT.");
+
   _uptimeMqtt.reset();
 
   ledEffect = &wordClock;
@@ -177,7 +184,7 @@ void onMqttConnect(bool sessionPresent)
 
 void onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
 {
-  Serial.println("Disconnected from MQTT.");
+  DEBUG_PRINTLN("Disconnected from MQTT.");
 
   if (WiFi.isConnected())
   {
@@ -189,7 +196,7 @@ void onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
 
 void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total)
 {
-  Serial.printf("topic: %s: ", topic);
+  DEBUG_PRINTF("topic: %s: ", topic);
 
   // THIS IS ONLY FOR SHORT PAYLOADS!!!
   // payload is in fact byte*, NOT char*!!!
@@ -197,7 +204,8 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
   {
     std::string value;
     value.assign((const char *)payload, len);
-    Serial.printf("%s\r\n", value.c_str());
+
+    DEBUG_PRINTF("%s\r\n", value.c_str());
 
     if (strcmp(topic, cBrightnessSetTopic) == 0)
     {
@@ -214,7 +222,8 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
 
 void connectToWifi()
 {
-  Serial.println("Connecting to Wi-Fi.");
+  DEBUG_PRINTLN("Connecting to Wi-Fi.");
+
   connectingAnimation.setHue(160);
   ledEffect = &connectingAnimation;
   WiFi.begin(WIFI_SSID, WIFI_PASS);
@@ -222,9 +231,9 @@ void connectToWifi()
 
 void onWifiConnect(const WiFiEventStationModeGotIP &event)
 {
-  Serial.println("Connected to Wi-Fi.");
-  _uptimeWifi.reset();
+  DEBUG_PRINTLN("Connected to Wi-Fi.");
 
+  _uptimeWifi.reset();
   connectToMqtt();
 
   // initialize NTP Client after WiFi is connected
@@ -233,7 +242,8 @@ void onWifiConnect(const WiFiEventStationModeGotIP &event)
 
 void onWifiDisconnect(const WiFiEventStationModeDisconnected &event)
 {
-  Serial.println("Disconnected from Wi-Fi.");
+  DEBUG_PRINTLN("Disconnected from Wi-Fi.");
+
   connectingAnimation.setHue(160);
   ledEffect = &connectingAnimation;
   mqttReconnectTimer.detach(); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
@@ -243,8 +253,8 @@ void onWifiDisconnect(const WiFiEventStationModeDisconnected &event)
 void setup()
 {
   Serial.begin(SERIAL_SPEED);
-  Serial.println();
-  Serial.println();
+  DEBUG_PRINTLN();
+  DEBUG_PRINTLN();
 
   FastLED.addLeds<CHIPSET, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
   FastLED.setMaxPowerInVoltsAndMilliamps(5, 2000); // FastLED power management set at 5V, 2A

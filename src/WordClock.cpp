@@ -45,8 +45,19 @@ bool WordClock::paint(bool force)
 
     if (_onGetTime(hours, minutes, seconds))
     {
-      // Adjust the time for special cases
-      adjustTime(hours, minutes, seconds);
+
+// When there are no minute LEDs, advance the clock by 2.5 minutes.
+// so that the current time is "centered" around the displayed time.
+// e.g. 16:57:30..17:02:29 are shown as "five o'clock"
+#ifndef HAS_MINUTES
+      int minuteOffset = (seconds < 30 ? 2 : 3);
+      // Check whether the offset pushes us into the next hour
+      if (minutes + minuteOffset >= 60)
+      {
+        hours++;
+      }
+      minutes = (minutes + minuteOffset) % 60;
+#endif
 
       updateHours(hours, minutes);
       updateMinutes(minutes);
@@ -55,25 +66,6 @@ bool WordClock::paint(bool force)
     }
   }
   return false;
-}
-
-void WordClock::adjustTime(int &hours, int &minutes, int &seconds)
-{
-  if (hours > 12)
-    hours = hours - 12;
-
-// When there are no minute LEDs, advance the clock by 2.5 minutes.
-// so that the current time is "centered" around the displayed time.
-// e.g. 16:57:30..17:02:29 are shown as "five o'clock"
-#ifndef HAS_MINUTES
-  int minuteOffset = (seconds < 30 ? 2 : 3);
-  // Check whether the offset pushes us into the next hour
-  if (minutes + minuteOffset >= 60)
-  {
-    hours++;
-  }
-  minutes = (minutes + minuteOffset) % 60;
-#endif
 }
 
 void WordClock::createWords(TWORDBUF &currentWords, int &hour, int &minute)
@@ -161,11 +153,15 @@ void WordClock::createWords(TWORDBUF &currentWords, int &hour, int &minute)
     break;
   }
 
+  // Limit to 12H display
+  if (hour > 12)
+    hour = hour - 12;
+
   switch (hour)
   {
   case 1:
     // "Es ist ein Uhr", aber "es ist fünf nach eins".
-    if ((minute >= 0 && minute < 2) || (minute >= 57 && minute <= 59))
+    if (minute >= 0 && minute < 4)
     {
       currentWords.push_back(_H_EIN_);
     }
@@ -222,18 +218,16 @@ void WordClock::updateHours(int &hours, int &minutes)
   // Update the LED matrix if the values have changed
   if (_lastWords != currentWords)
   {
-#ifdef DEBUG
-    Serial.printf("Sending %d words:", currentWords.size());
-#endif
+    DEBUG_PRINTF("%02d:%02d sending %d words:", hours, minutes, currentWords.size());
+
     memset8(_leds, 0, sizeof(struct CRGB) * _ledMatrix->getCount());
     for (size_t i = 0; i < currentWords.size(); i++)
     {
       sendWord(currentWords[i]);
     }
     _lastWords = currentWords;
-#ifdef DEBUG
-    Serial.printf("\r\n");
-#endif
+
+    DEBUG_PRINTF("\r\n");
   }
 }
 
@@ -284,7 +278,7 @@ void WordClock::sendWord(uint8_t index)
 #ifdef DEBUG
   char buffer[30];
   strcpy_P(buffer, (char *)pgm_read_dword(&(DEBUGTWORDS[index])));
-  Serial.printf(" %d=%s", index, buffer);
+  DEBUG_PRINTF(" %d=%s", index, buffer);
 #endif
 
   CRGB actcolor = getRandomColor();
