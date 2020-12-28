@@ -83,21 +83,9 @@ private:
   //    }
   //
   //
-  int16_t XY(uint8_t x, uint8_t y) const 
+  int16_t XY(uint8_t x, uint8_t y) const
   {
     int16_t i;
-
-    if (_serpentineLayout == false)
-    {
-      if (_vertical == false)
-      {
-        i = (y * _width) + x;
-      }
-      else
-      {
-        i = _height * (_width - (x + 1)) + y;
-      }
-    }
 
     if (_serpentineLayout == true)
     {
@@ -125,6 +113,17 @@ private:
         {
           i = _height * (_width - x) - (y + 1);
         }
+      }
+    }
+    else
+    {
+      if (_vertical == false)
+      {
+        i = (y * _width) + x;
+      }
+      else
+      {
+        i = _height * (_width - (x + 1)) + y;
       }
     }
 
@@ -171,7 +170,7 @@ private:
   // that one safety pixel.  And if you try to READ from the safety pixel,
   // you'll read whatever was written there last, reglardless of what coordinates
   // were supplied.
-  int16_t XYSafe(uint8_t x, uint8_t y) const 
+  int16_t XYSafe(uint8_t x, uint8_t y) const
   {
     if (x >= _width)
       return -1;

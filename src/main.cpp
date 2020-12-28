@@ -6,6 +6,7 @@
 #include "OtaHelper.h"
 #include "TimeHelper.h"
 #include "WordClock.h"
+#include "ConnectingAnimation.h"
 #include "RainbowAnimation.h"
 #include "ArduinoBorealis.h"
 
@@ -36,6 +37,8 @@ LedMatrix ledMatrix(MATRIX_WIDTH, MATRIX_HEIGHT);
 LedEffect *ledEffect = nullptr;
 
 OtaHelper otaHelper(&ledMatrix, leds, NUM_LEDS);
+
+ConnectingAnimation connectingAnimation(&ledMatrix, leds, NUM_LEDS);
 WordClock wordClock(&ledMatrix, leds, NUM_LEDS, onGetTime);
 RainbowAnimation rainbowAnimation(&ledMatrix, leds, NUM_LEDS);
 BorealisAnimation borealisAnimation(&ledMatrix, leds, NUM_LEDS);
@@ -46,9 +49,6 @@ Ticker wifiReconnectTimer;
 
 AsyncMqttClient mqttClient;
 Ticker mqttReconnectTimer;
-
-Ticker ledTicker;
-const float LED_BLINK_DELAY = 0.5;
 
 uint8_t displayMode = 0;
 bool modeChanged = false;
@@ -72,7 +72,7 @@ Uptime _uptimeWifi;
 // Statistics
 #define cStatsTopic cMqttPrefix "$stats/"
 #define cSignalTopic cStatsTopic "signal"
-#define cHeapTopic cStatsTopic "heap"
+#define cHeapTopic cStatsTopic "freeheap"
 #define cUptimeTopic cStatsTopic "uptime"
 #define cUptimeWifiTopic cStatsTopic "uptimewifi"
 #define cUptimeMqttTopic cStatsTopic "uptimemqtt"
@@ -137,6 +137,9 @@ void setMode(std::string value)
     case 2:
       ledEffect = &borealisAnimation;
       break;
+    case 3:
+      ledEffect = &connectingAnimation;
+      break;
     default:
       ledEffect = &wordClock;
     }
@@ -144,28 +147,23 @@ void setMode(std::string value)
   }
 }
 
-void blinkLED(CRGB::HTMLColorCode color)
-{
-  if (leds[FIRST_MINUTE] == CRGB(0))
-    leds[FIRST_MINUTE] = color;
-  else
-    leds[FIRST_MINUTE] = CRGB(0);
-  FastLED.show();
-}
-
 // MQTT connection and event handling
 
 void connectToMqtt()
 {
-  ledTicker.attach(LED_BLINK_DELAY, blinkLED, CRGB::LimeGreen);
   Serial.println("Connecting to MQTT.");
+  connectingAnimation.setHue(192);
+  ledEffect = &connectingAnimation;
   mqttClient.connect();
 }
 
 void onMqttConnect(bool sessionPresent)
 {
-  ledTicker.detach();
   Serial.println("Connected to MQTT.");
+  _uptimeMqtt.reset();
+
+  ledEffect = &wordClock;
+  modeChanged = true;
 
   mqttClient.subscribe(cBrightnessSetTopic, 1);
   mqttClient.subscribe(cModeSetTopic, 1);
@@ -183,7 +181,8 @@ void onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
 
   if (WiFi.isConnected())
   {
-    ledTicker.attach(LED_BLINK_DELAY, blinkLED, CRGB::LimeGreen);
+    connectingAnimation.setHue(192);
+    ledEffect = &connectingAnimation;
     mqttReconnectTimer.once(2, connectToMqtt);
   }
 }
@@ -215,14 +214,14 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
 
 void connectToWifi()
 {
-  ledTicker.attach(LED_BLINK_DELAY, blinkLED, CRGB::Gold);
   Serial.println("Connecting to Wi-Fi.");
+  connectingAnimation.setHue(160);
+  ledEffect = &connectingAnimation;
   WiFi.begin(WIFI_SSID, WIFI_PASS);
 }
 
 void onWifiConnect(const WiFiEventStationModeGotIP &event)
 {
-  ledTicker.detach();
   Serial.println("Connected to Wi-Fi.");
   _uptimeWifi.reset();
 
@@ -235,6 +234,8 @@ void onWifiConnect(const WiFiEventStationModeGotIP &event)
 void onWifiDisconnect(const WiFiEventStationModeDisconnected &event)
 {
   Serial.println("Disconnected from Wi-Fi.");
+  connectingAnimation.setHue(160);
+  ledEffect = &connectingAnimation;
   mqttReconnectTimer.detach(); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
   wifiReconnectTimer.once(2, connectToWifi);
 }
@@ -246,10 +247,12 @@ void setup()
   Serial.println();
 
   FastLED.addLeds<CHIPSET, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
+  FastLED.setMaxPowerInVoltsAndMilliamps(5, 2000); // FastLED power management set at 5V, 2A
   FastLED.setBrightness(BRIGHTNESS);
+  FastLED.setDither(BINARY_DITHER);
   FastLED.clear(true);
 
-  ledEffect = &wordClock;
+  ledEffect = &connectingAnimation;
 
   otaHelper.init();
   wordClock.init();
@@ -282,7 +285,7 @@ void loop()
       {
         sendStats();
         _lastUpdate = millis();
-}
+      }
 
     ArduinoOTA.handle();
   }
