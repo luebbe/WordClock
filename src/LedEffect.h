@@ -18,7 +18,7 @@ protected:
 	CRGB getRandomColor() const;
 
 public:
-	explicit LedEffect(CRGB * leds, uint16_t count);
+	explicit LedEffect(CRGB *leds, uint16_t count);
 	virtual ~LedEffect();
 
 	virtual void init();

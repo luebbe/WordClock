@@ -182,9 +182,7 @@ const char *const DEBUGTWORDS[] PROGMEM = {
     C_X_DREI,
     C_X_VIER,
     C_X_VIERTEL,
-    C_LAST
-
-};
+    C_LAST};
 #endif
 
 struct TWORDINFO
@@ -195,8 +193,8 @@ struct TWORDINFO
 };
 
 // Word positions by LED numbers.
-// This is for a matrix of 11x10 pixels with 0,0
-// at the bottom left.
+// This is for a matrix of 11x10 pixels
+// with 0,0 at the bottom left.
 static const TWORDINFO TLEDS[] = {
     // x, y, length
     {0, 0, 0},  // NULL

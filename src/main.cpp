@@ -9,6 +9,7 @@
 #include "ConnectingAnimation.h"
 #include "RainbowAnimation.h"
 #include "ArduinoBorealis.h"
+#include "MatrixAnimation.h"
 
 #include "debugutils.h"
 #include "secrets.h"
@@ -47,6 +48,7 @@ ConnectingAnimation connectingAnimation(&ledMatrix, leds, NUM_LEDS);
 WordClock wordClock(&ledMatrix, leds, NUM_LEDS, onGetTime);
 RainbowAnimation rainbowAnimation(&ledMatrix, leds, NUM_LEDS);
 BorealisAnimation borealisAnimation(&ledMatrix, leds, NUM_LEDS);
+MatrixAnimation matrixAnimation(&ledMatrix, leds, NUM_LEDS);
 
 WiFiEventHandler wifiConnectHandler;
 WiFiEventHandler wifiDisconnectHandler;
@@ -151,7 +153,7 @@ void setMode(std::string value)
       ledEffect = &borealisAnimation;
       break;
     case 3:
-      ledEffect = &connectingAnimation;
+      ledEffect = &matrixAnimation;
       break;
     default:
       ledEffect = &wordClock;
