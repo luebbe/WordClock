@@ -16,6 +16,8 @@ MatrixAnimation::MatrixAnimation(const ILedMatrix *ledMatrix, CRGB *_leds, uint1
 
 bool MatrixAnimation::paint(bool force)
 {
+  bool result = false;
+
   // falling speed
   EVERY_N_MILLIS(100)
   {
@@ -59,6 +61,7 @@ bool MatrixAnimation::paint(bool force)
     int8_t spawnX = random8(_ledMatrix->getWidth());
     _leds[_ledMatrix->toStrip(spawnX, _ledMatrix->getHeight()-1)] = _startColor;
     // }
-    return true;
+    result = true;
   }
+  return result;
 }
