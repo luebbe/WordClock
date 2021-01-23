@@ -9,7 +9,7 @@
 
 ConnectingAnimation::ConnectingAnimation(const ILedMatrix *ledMatrix, CRGB *leds, uint16_t count)
     : LedEffect(leds, count),
-      _ledMatrix(ledMatrix)
+      _ledMatrix(ledMatrix), _hue(0)
 {
 }
 

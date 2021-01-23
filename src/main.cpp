@@ -133,7 +133,7 @@ void setMode(std::string value)
   DEBUG_PRINTLN("Set Mode");
 
   uint8_t i = atoi(value.c_str());
-  if ((0 <= i) && (i <= 255) && (i != displayMode))
+  if ((i <= 255) && (i != displayMode))
   {
     displayMode = i;
     modeChanged = true;
