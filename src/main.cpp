@@ -2,6 +2,7 @@
 #include <ESP8266WiFi.h>
 #include <Ticker.h>
 #include <AsyncMqttClient.h>
+#include <BH1750.h>
 
 #include "OtaHelper.h"
 #include "TimeHelper.h"
@@ -20,7 +21,9 @@
 #define FW_VERSION VERSION
 #define FW_DATE BUILD_TIMESTAMP
 
-#define LED_PIN 5 // D1 on D1 Mini
+#define PIN_LED D1 // on D1 Mini
+#define PIN_SDA D6 // on D1 Mini
+#define PIN_SCL D7 // on D1 Mini
 
 #define COLOR_ORDER GRB
 #define CHIPSET WS2812
@@ -30,7 +33,16 @@
 #define MATRIX_WIDTH 11
 #define MATRIX_HEIGHT 10
 
+// Minimum and initial brightness for LEDs
 #define BRIGHTNESS 20
+
+// Observed maximum daylight lux values around noon. Adjust this to the light levels at your clock's location.
+// The LEDs will reach maximum brightness at this lux level and above.
+#define DAYLIGHT_LUX 2500
+
+#define SEND_STATS_INTERVAL 60000UL // Send stats every 60 seconds
+#define SEND_LIGHT_INTERVAL 5000UL  // Send light level every 5 seconds
+#define CHECK_LIGHT_INTERVAL 500UL  // Check light level twice per second
 
 // Params for width, height and number of extra LEDs are defined in WordClock.h
 #define NUM_LEDS (MATRIX_WIDTH * MATRIX_HEIGHT) + MINUTE_LEDS + SECOND_LEDS
@@ -40,8 +52,9 @@ CRGB leds_plus_safety_pixel[NUM_LEDS + 1];    // The first pixel in this array i
 CRGB *const leds(leds_plus_safety_pixel + 1); // This is the "off-by-one" array that we actually work with and which is passed to FastLED!
 
 LedMatrix ledMatrix(MATRIX_WIDTH, MATRIX_HEIGHT);
-LedEffect *ledEffect = nullptr;
+LedEffect *_ledEffect = nullptr;
 
+BH1750 lightMeter;
 OtaHelper otaHelper(&ledMatrix, leds, NUM_LEDS);
 
 ConnectingAnimation connectingAnimation(&ledMatrix, leds, NUM_LEDS);
@@ -57,9 +70,14 @@ Ticker wifiReconnectTimer;
 AsyncMqttClient mqttClient;
 Ticker mqttReconnectTimer;
 
-uint8_t displayMode = 0;
-bool modeChanged = false;
-ulong _lastUpdate = 0;
+uint8_t _displayMode = 0;
+bool _modeChanged = false;
+ulong _lastStatsSent = 0;
+
+ulong _lastLightLevelCheck = 0;
+ulong _lastLightSent = 0;
+float _lux = NAN;
+byte _mtReg = 0;
 
 Uptime _uptime;
 Uptime _uptimeMqtt;
@@ -89,8 +107,8 @@ Uptime _uptimeWifi;
 #define cUptimeMqttTopic cStatsTopic "uptimemqtt"
 
 // Operation mode
+#define cLightlevelTopic cMqttPrefix "lightlevel"
 #define cBrightnessTopic cMqttPrefix "brightness"
-#define cBrightnessSetTopic cMqttPrefix "brightness/set"
 #define cModeTopic cMqttPrefix "mode"
 #define cModeSetTopic cMqttPrefix "mode/set"
 
@@ -99,7 +117,8 @@ void sendState()
   DEBUG_PRINTLN("Sending State");
 
   mqttClient.publish(cBrightnessTopic, 1, true, String(FastLED.getBrightness()).c_str());
-  mqttClient.publish(cModeTopic, 1, true, String(displayMode).c_str());
+  mqttClient.publish(cModeTopic, 1, true, String(_displayMode).c_str());
+  mqttClient.publish(cLightlevelTopic, 1, true, String(_lux).c_str());
 }
 
 void sendStats()
@@ -121,42 +140,35 @@ void sendStats()
   mqttClient.publish(cUptimeMqttTopic, 1, true, statusStr);
 }
 
-void setBrightness(std::string value)
-{
-  uint8_t i = atoi(value.c_str());
-  FastLED.setBrightness(i);
-  sendState();
-}
-
 void setMode(std::string value)
 {
   DEBUG_PRINTLN("Set Mode");
 
   uint8_t i = atoi(value.c_str());
-  if ((i <= 255) && (i != displayMode))
+  if ((i <= 255) && (i != _displayMode))
   {
-    displayMode = i;
-    modeChanged = true;
+    _displayMode = i;
+    _modeChanged = true;
     FastLED.clear(true);
 
-    DEBUG_PRINTF("=%d\r\n", displayMode);
+    DEBUG_PRINTF("=%d\r\n", _displayMode);
 
-    switch (displayMode)
+    switch (_displayMode)
     {
     case 0:
-      ledEffect = &wordClock;
+      _ledEffect = &wordClock;
       break;
     case 1:
-      ledEffect = &rainbowAnimation;
+      _ledEffect = &rainbowAnimation;
       break;
     case 2:
-      ledEffect = &borealisAnimation;
+      _ledEffect = &borealisAnimation;
       break;
     case 3:
-      ledEffect = &matrixAnimation;
+      _ledEffect = &matrixAnimation;
       break;
     default:
-      ledEffect = &wordClock;
+      _ledEffect = &wordClock;
     }
     sendState();
   }
@@ -169,7 +181,7 @@ void connectToMqtt()
   DEBUG_PRINTLN("Connecting to MQTT.");
 
   connectingAnimation.setHue(192);
-  ledEffect = &connectingAnimation;
+  _ledEffect = &connectingAnimation;
   mqttClient.connect();
 }
 
@@ -179,10 +191,9 @@ void onMqttConnect(bool sessionPresent)
 
   _uptimeMqtt.reset();
 
-  ledEffect = &wordClock;
-  modeChanged = true;
+  _ledEffect = &wordClock;
+  _modeChanged = true;
 
-  mqttClient.subscribe(cBrightnessSetTopic, 1);
   mqttClient.subscribe(cModeSetTopic, 1);
 
   mqttClient.publish(cFirmwareName, 1, true, FW_NAME);
@@ -203,7 +214,7 @@ void onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
   if (WiFi.isConnected())
   {
     connectingAnimation.setHue(192);
-    ledEffect = &connectingAnimation;
+    _ledEffect = &connectingAnimation;
     mqttReconnectTimer.once(2, connectToMqtt);
   }
 }
@@ -221,11 +232,7 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
 
     DEBUG_PRINTF("%s\r\n", value.c_str());
 
-    if (strcmp(topic, cBrightnessSetTopic) == 0)
-    {
-      setBrightness(value);
-    }
-    else if (strcmp(topic, cModeSetTopic) == 0)
+    if (strcmp(topic, cModeSetTopic) == 0)
     {
       setMode(value);
     }
@@ -239,7 +246,7 @@ void connectToWifi()
   DEBUG_PRINTLN("Connecting to Wi-Fi.");
 
   connectingAnimation.setHue(160);
-  ledEffect = &connectingAnimation;
+  _ledEffect = &connectingAnimation;
   WiFi.begin(WIFI_SSID, WIFI_PASS);
 }
 
@@ -259,9 +266,83 @@ void onWifiDisconnect(const WiFiEventStationModeDisconnected &event)
   DEBUG_PRINTLN("Disconnected from Wi-Fi.");
 
   connectingAnimation.setHue(160);
-  ledEffect = &connectingAnimation;
+  _ledEffect = &connectingAnimation;
   mqttReconnectTimer.detach(); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
   wifiReconnectTimer.once(2, connectToWifi);
+}
+
+// Automatic brightness adjustment for LEDs via BH1750 light sensor
+
+void adjustBrightness(float lux)
+{
+  // lux = 1..65535 convert to 1..255
+  // Limit to observed maximum value.
+  if (lux > DAYLIGHT_LUX)
+  {
+    lux = DAYLIGHT_LUX;
+  }
+
+  // scale to 1..255
+  uint8_t brightness = round(lux * 255 / DAYLIGHT_LUX);
+
+  // never go below the minimal brightness
+  if (brightness < BRIGHTNESS)
+  {
+    brightness = BRIGHTNESS;
+  }
+  FastLED.setBrightness(brightness);
+}
+
+void setMTreg(uint8_t mtReg)
+{
+  if (_mtReg != mtReg)
+  {
+    _mtReg = mtReg;
+    if (lightMeter.setMTreg(mtReg))
+    {
+      DEBUG_PRINTF("Setting MTReg to %d\r\n", mtReg);
+    }
+    else
+    {
+      DEBUG_PRINTF("Error setting MTReg to %d\r\n", mtReg);
+    }
+  }
+}
+
+void checkLightLevel()
+{
+  const byte cMtRegBright = 32;
+  const byte cMtRegTypical = 69;
+  const byte cMtRegDark = 138;
+
+  if (lightMeter.measurementReady(true))
+  {
+    _lux = lightMeter.readLightLevel();
+    DEBUG_PRINTF("Light: %7.1f lx mtReg=%d\r\n", _lux, _mtReg);
+
+    if (_lux < 0)
+    {
+      DEBUG_PRINTLN(F("Error condition detected"));
+    }
+    else if (_lux > 40000.0)
+    {
+      // reduce measurement time - needed in direct sun light
+      setMTreg(cMtRegBright);
+      adjustBrightness(_lux);
+    }
+    else if (_lux > 10.0)
+    {
+      // typical light environment
+      setMTreg(cMtRegTypical);
+      adjustBrightness(_lux);
+    }
+    else if (_lux <= 10.0)
+    {
+      // very low light environment
+      setMTreg(cMtRegDark);
+      adjustBrightness(_lux);
+    }
+  }
 }
 
 void setup()
@@ -270,13 +351,16 @@ void setup()
   DEBUG_PRINTLN();
   DEBUG_PRINTLN();
 
-  FastLED.addLeds<CHIPSET, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
+  Wire.begin(PIN_SDA, PIN_SCL);
+  lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE);
+
+  FastLED.addLeds<CHIPSET, PIN_LED, COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
   FastLED.setMaxPowerInVoltsAndMilliamps(5, 2000); // FastLED power management set at 5V, 2A
   FastLED.setBrightness(BRIGHTNESS);
   FastLED.setDither(BINARY_DITHER);
   FastLED.clear(true);
 
-  ledEffect = &connectingAnimation;
+  _ledEffect = &connectingAnimation;
 
   otaHelper.init();
   wordClock.init();
@@ -296,21 +380,38 @@ void setup()
 
 void loop()
 {
-  if (ledEffect && ledEffect->paint(modeChanged))
+  if (_ledEffect && _ledEffect->paint(_modeChanged))
   {
     FastLED.show();
-    modeChanged = false;
+    _modeChanged = false;
+  }
+
+  ulong _millis = millis();
+
+  // Check light level every five seconds
+  if ((_millis - _lastLightLevelCheck >= CHECK_LIGHT_INTERVAL) || (_lastLightLevelCheck == 0))
+  {
+    checkLightLevel();
+    _lastLightLevelCheck = _millis;
   }
 
   if (WiFi.isConnected())
   {
     if (mqttClient.connected())
-      if ((millis() - _lastUpdate >= 60000UL) || (_lastUpdate == 0))
+    {
+      // Send status every 60 seconds
+      if ((_millis - _lastStatsSent >= SEND_STATS_INTERVAL) || (_lastStatsSent == 0))
       {
         sendStats();
-        _lastUpdate = millis();
+        _lastStatsSent = _millis;
       }
-
+      // Send state (brightness/mode) every 5 seconds
+      if ((_millis - _lastLightSent >= SEND_LIGHT_INTERVAL) || (_lastLightSent == 0))
+      {
+        sendState();
+        _lastLightSent = _millis;
+      }
+    }
     ArduinoOTA.handle();
   }
 }
