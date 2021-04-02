@@ -336,7 +336,7 @@ void checkLightLevel()
       setMTreg(cMtRegTypical);
       adjustBrightness(_lux);
     }
-    else if (_lux <= 10.0)
+    else // 0 <= _lux <= 10.0
     {
       // very low light environment
       setMTreg(cMtRegDark);
