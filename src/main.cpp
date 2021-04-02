@@ -42,7 +42,7 @@
 
 #define SEND_STATS_INTERVAL 60000UL // Send stats every 60 seconds
 #define SEND_LIGHT_INTERVAL 5000UL  // Send light level every 5 seconds
-#define CHECK_LIGHT_INTERVAL 500UL  // Check light level twice per second
+#define CHECK_LIGHT_INTERVAL 50UL   // Check light level 20 times per second
 
 // Params for width, height and number of extra LEDs are defined in WordClock.h
 #define NUM_LEDS (MATRIX_WIDTH * MATRIX_HEIGHT) + MINUTE_LEDS + SECOND_LEDS
@@ -352,7 +352,8 @@ void setup()
   DEBUG_PRINTLN();
 
   Wire.begin(PIN_SDA, PIN_SCL);
-  lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE);
+
+  lightMeter.begin(BH1750::CONTINUOUS_LOW_RES_MODE); // Run in Low-Res mode to allow faster sampling
 
   FastLED.addLeds<CHIPSET, PIN_LED, COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
   FastLED.setMaxPowerInVoltsAndMilliamps(5, 2000); // FastLED power management set at 5V, 2A
