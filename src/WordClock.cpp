@@ -30,7 +30,7 @@ void WordClock::init()
 bool WordClock::paint(bool force)
 {
   ulong now = millis();
-  if ((now - _lastUpdate >= 1000UL) || (_lastUpdate == 0))
+  if ((now - _lastUpdate >= UPDATE_MS) || (_lastUpdate == 0))
   {
     _lastUpdate = now;
 
