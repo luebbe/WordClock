@@ -5,15 +5,15 @@
  * Author: Lübbe Onken (http://github.com/luebbe)
  */
 
-#include "ConnectingAnimation.h"
+#include "SnakeAnimation.h"
 
-ConnectingAnimation::ConnectingAnimation(const ILedMatrix *ledMatrix, CRGB *leds, uint16_t count)
+SnakeAnimation::SnakeAnimation(const ILedMatrix *ledMatrix, CRGB *leds, uint16_t count)
     : LedEffect(leds, count),
       _ledMatrix(ledMatrix), _hue(0)
 {
 }
 
-bool ConnectingAnimation::paint(bool force)
+bool SnakeAnimation::paint(bool force)
 {
   // Update the "Fraction Bar" by 1/16th pixel every time
   _pos16 += _delta16;
@@ -39,7 +39,7 @@ bool ConnectingAnimation::paint(bool force)
 // rendered using 'anti-aliasing' of pixel brightness.
 // The bar width is specified in whole pixels.
 // Arguably, this is the interesting code.
-void ConnectingAnimation::drawFractionalBar(int pos16, int width, uint8_t hue)
+void SnakeAnimation::drawFractionalBar(int pos16, int width, uint8_t hue)
 {
   int i = pos16 / 16;          // convert from pos to raw pixel number
   uint8_t frac = pos16 & 0x0F; // extract the 'factional' part of the position

@@ -7,7 +7,7 @@
 #include "OtaHelper.h"
 #include "TimeHelper.h"
 #include "WordClock.h"
-#include "ConnectingAnimation.h"
+#include "SnakeAnimation.h"
 #include "RainbowAnimation.h"
 #include "ArduinoBorealis.h"
 #include "MatrixAnimation.h"
@@ -57,7 +57,7 @@ LedEffect *_ledEffect = nullptr;
 BH1750 lightMeter;
 OtaHelper otaHelper(&ledMatrix, leds, NUM_LEDS);
 
-ConnectingAnimation connectingAnimation(&ledMatrix, leds, NUM_LEDS);
+SnakeAnimation snakeAnimation(&ledMatrix, leds, NUM_LEDS);
 WordClock wordClock(&ledMatrix, leds, NUM_LEDS, onGetTime);
 RainbowAnimation rainbowAnimation(&ledMatrix, leds, NUM_LEDS);
 BorealisAnimation borealisAnimation(&ledMatrix, leds, NUM_LEDS);
@@ -167,6 +167,9 @@ void setMode(std::string value)
     case 3:
       _ledEffect = &matrixAnimation;
       break;
+    case 4:
+      _ledEffect = &snakeAnimation;
+      break;
     default:
       _ledEffect = &wordClock;
     }
@@ -180,8 +183,8 @@ void connectToMqtt()
 {
   DEBUG_PRINTLN("Connecting to MQTT.");
 
-  connectingAnimation.setHue(192);
-  _ledEffect = &connectingAnimation;
+  snakeAnimation.setHue(192);
+  _ledEffect = &snakeAnimation;
   mqttClient.connect();
 }
 
@@ -213,8 +216,8 @@ void onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
 
   if (WiFi.isConnected())
   {
-    connectingAnimation.setHue(192);
-    _ledEffect = &connectingAnimation;
+    snakeAnimation.setHue(192);
+    _ledEffect = &snakeAnimation;
     mqttReconnectTimer.once(2, connectToMqtt);
   }
 }
@@ -245,8 +248,8 @@ void connectToWifi()
 {
   DEBUG_PRINTLN("Connecting to Wi-Fi.");
 
-  connectingAnimation.setHue(160);
-  _ledEffect = &connectingAnimation;
+  snakeAnimation.setHue(160);
+  _ledEffect = &snakeAnimation;
   WiFi.begin(WIFI_SSID, WIFI_PASS);
 }
 
@@ -265,8 +268,8 @@ void onWifiDisconnect(const WiFiEventStationModeDisconnected &event)
 {
   DEBUG_PRINTLN("Disconnected from Wi-Fi.");
 
-  connectingAnimation.setHue(160);
-  _ledEffect = &connectingAnimation;
+  snakeAnimation.setHue(160);
+  _ledEffect = &snakeAnimation;
   mqttReconnectTimer.detach(); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
   wifiReconnectTimer.once(2, connectToWifi);
 }
@@ -361,7 +364,7 @@ void setup()
   FastLED.setDither(BINARY_DITHER);
   FastLED.clear(true);
 
-  _ledEffect = &connectingAnimation;
+  _ledEffect = &snakeAnimation;
 
   otaHelper.init();
   wordClock.init();
@@ -381,7 +384,7 @@ void setup()
 
 void loop()
 {
-  if (_ledEffect && _ledEffect->paint(_modeChanged))
+  if ((_ledEffect && _ledEffect->paint(_modeChanged)))// || statusOverlay())
   {
     FastLED.show();
     _modeChanged = false;

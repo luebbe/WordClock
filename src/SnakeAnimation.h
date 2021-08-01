@@ -10,7 +10,7 @@
 #include "LedEffect.h"
 #include "LedMatrix.h"
 
-class ConnectingAnimation : public LedEffect
+class SnakeAnimation : public LedEffect
 {
 private:
 #define FACTOR 100
@@ -23,7 +23,7 @@ private:
   void drawFractionalBar(int pos16, int width, uint8_t hue);
 
 public:
-  explicit ConnectingAnimation(const ILedMatrix *ledMatrix, CRGB *leds, uint16_t count);
+  explicit SnakeAnimation(const ILedMatrix *ledMatrix, CRGB *leds, uint16_t count);
 
   void init(){};
   bool paint(bool force) override;
