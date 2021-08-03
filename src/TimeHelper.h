@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ESP8266WiFi.h>
 #include <WiFiUdp.h>
 #include <NTPClient.h>
 #include <TimeZone.h>
@@ -18,6 +19,8 @@ Timezone Europe(CEST, CET);
 
 bool onGetTime(int &hours, int &minutes, int &seconds)
 {
+  if (!WiFi.isConnected())
+    return false;
   if (timeClient.update())
   {
     time_t localTime = Europe.toLocal(timeClient.getEpochTime());

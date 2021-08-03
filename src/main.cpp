@@ -7,6 +7,7 @@
 #include "OtaHelper.h"
 #include "TimeHelper.h"
 #include "WordClock.h"
+#include "StatusAnimation.h"
 #include "SnakeAnimation.h"
 #include "RainbowAnimation.h"
 #include "ArduinoBorealis.h"
@@ -24,6 +25,7 @@
 #define PIN_LED D1 // on D1 Mini
 #define PIN_SDA D6 // on D1 Mini
 #define PIN_SCL D7 // on D1 Mini
+#define PIN_ADC A0 // on D1 Mini
 
 #define COLOR_ORDER GRB
 #define CHIPSET WS2812
@@ -57,6 +59,7 @@ LedEffect *_ledEffect = nullptr;
 BH1750 lightMeter;
 OtaHelper otaHelper(&ledMatrix, leds, NUM_LEDS);
 
+StatusAnimation statusAnimation(&ledMatrix, leds, NUM_LEDS);
 SnakeAnimation snakeAnimation(&ledMatrix, leds, NUM_LEDS);
 WordClock wordClock(&ledMatrix, leds, NUM_LEDS, onGetTime);
 RainbowAnimation rainbowAnimation(&ledMatrix, leds, NUM_LEDS);
@@ -140,14 +143,13 @@ void sendStats()
   mqttClient.publish(cUptimeMqttTopic, 1, true, statusStr);
 }
 
-void setMode(std::string value)
+void setMode(uint8_t mode)
 {
   DEBUG_PRINTLN("Set Mode");
 
-  uint8_t i = atoi(value.c_str());
-  if ((i <= 255) && (i != _displayMode))
+  if ((mode <= 255) && (mode != _displayMode))
   {
-    _displayMode = i;
+    _displayMode = mode;
     _modeChanged = true;
     FastLED.clear(true);
 
@@ -183,8 +185,7 @@ void connectToMqtt()
 {
   DEBUG_PRINTLN("Connecting to MQTT.");
 
-  snakeAnimation.setHue(192);
-  _ledEffect = &snakeAnimation;
+  statusAnimation.setStatus(CLOCK_STATUS::MQTT_DISCONNECTED);
   mqttClient.connect();
 }
 
@@ -192,6 +193,7 @@ void onMqttConnect(bool sessionPresent)
 {
   DEBUG_PRINTLN("Connected to MQTT.");
 
+  statusAnimation.setStatus(CLOCK_STATUS::MQTT_CONNECTED);
   _uptimeMqtt.reset();
 
   _ledEffect = &wordClock;
@@ -214,10 +216,9 @@ void onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
 {
   DEBUG_PRINTLN("Disconnected from MQTT.");
 
+  statusAnimation.setStatus(CLOCK_STATUS::MQTT_DISCONNECTED);
   if (WiFi.isConnected())
   {
-    snakeAnimation.setHue(192);
-    _ledEffect = &snakeAnimation;
     mqttReconnectTimer.once(2, connectToMqtt);
   }
 }
@@ -237,7 +238,7 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
 
     if (strcmp(topic, cModeSetTopic) == 0)
     {
-      setMode(value);
+      setMode(atoi(value.c_str()));
     }
   }
 }
@@ -248,8 +249,7 @@ void connectToWifi()
 {
   DEBUG_PRINTLN("Connecting to Wi-Fi.");
 
-  snakeAnimation.setHue(160);
-  _ledEffect = &snakeAnimation;
+  statusAnimation.setStatus(CLOCK_STATUS::WIFI_DISCONNECTED);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
 }
 
@@ -257,6 +257,7 @@ void onWifiConnect(const WiFiEventStationModeGotIP &event)
 {
   DEBUG_PRINTLN("Connected to Wi-Fi.");
 
+  statusAnimation.setStatus(CLOCK_STATUS::WIFI_CONNECTED);
   _uptimeWifi.reset();
   connectToMqtt();
 
@@ -268,8 +269,7 @@ void onWifiDisconnect(const WiFiEventStationModeDisconnected &event)
 {
   DEBUG_PRINTLN("Disconnected from Wi-Fi.");
 
-  snakeAnimation.setHue(160);
-  _ledEffect = &snakeAnimation;
+  statusAnimation.setStatus(CLOCK_STATUS::WIFI_DISCONNECTED);
   mqttReconnectTimer.detach(); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
   wifiReconnectTimer.once(2, connectToWifi);
 }
@@ -301,14 +301,15 @@ void setMTreg(uint8_t mtReg)
   if (_mtReg != mtReg)
   {
     _mtReg = mtReg;
-    if (lightMeter.setMTreg(mtReg))
-    {
-      DEBUG_PRINTF("Setting MTReg to %d\r\n", mtReg);
-    }
-    else
-    {
-      DEBUG_PRINTF("Error setting MTReg to %d\r\n", mtReg);
-    }
+    lightMeter.setMTreg(mtReg);
+    // if (lightMeter.setMTreg(mtReg))
+    // {
+    //   // DEBUG_PRINTF("Setting MTReg to %d\r\n", mtReg);
+    // }
+    // else
+    // {
+    //   DEBUG_PRINTF("Error setting MTReg to %d\r\n", mtReg);
+    // }
   }
 }
 
@@ -321,11 +322,11 @@ void checkLightLevel()
   if (lightMeter.measurementReady(true))
   {
     _lux = lightMeter.readLightLevel();
-    DEBUG_PRINTF("Light: %7.1f lx mtReg=%d\r\n", _lux, _mtReg);
+    // DEBUG_PRINTF("Light: %7.1f lx mtReg=%d\r\n", _lux, _mtReg);
 
     if (_lux < 0)
     {
-      DEBUG_PRINTLN(F("Error condition detected"));
+      DEBUG_PRINTLN(F("Light: Error condition detected"));
     }
     else if (_lux > 40000.0)
     {
@@ -364,7 +365,9 @@ void setup()
   FastLED.setDither(BINARY_DITHER);
   FastLED.clear(true);
 
-  _ledEffect = &snakeAnimation;
+  // Initialize random number generator
+  randomSeed(analogRead(PIN_ADC));
+  setMode(random(1, 5));
 
   otaHelper.init();
   wordClock.init();
@@ -384,10 +387,24 @@ void setup()
 
 void loop()
 {
-  if ((_ledEffect && _ledEffect->paint(_modeChanged)))// || statusOverlay())
+  bool update = false;
+
+  // Do it in two steps in order to always get the overlay if there is one. A simple '||' will skip the second check if the first evaluates to true
+  if ((_ledEffect && _ledEffect->paint(_modeChanged)))
+  {
+    // Reset "force" repaint flag
+    _modeChanged = false;
+    update = true;
+  }
+
+  if (statusAnimation.paint(_modeChanged))
+  {
+    update = true;
+  }
+
+  if (update)
   {
     FastLED.show();
-    _modeChanged = false;
   }
 
   ulong _millis = millis();
