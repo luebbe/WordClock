@@ -256,13 +256,22 @@ void WordClock::updateMinutes(int &minutes)
 void WordClock::updateSeconds(int &seconds)
 {
 #ifdef HAS_SECONDS
+  static bool getColor = true;
   int secondIndex = (seconds * SECOND_LEDS / 60);
 
   // Erase buffer in second 0 and pick a new color for all LEDs for the next minute
   if (secondIndex == 0)
   {
-    memset8(_secondLEDs, 0, sizeof(struct CRGB) * SECOND_LEDS);
-    _secondColor = getRandomColor();
+    if (getColor)
+    {
+      memset8(_secondLEDs, 0, sizeof(struct CRGB) * SECOND_LEDS);
+      _secondColor = getRandomColor();
+      getColor = false; // get a new color only once during the first second
+    }
+  }
+  else
+  {
+    getColor = true;
   }
 
   // Now add the offset for the "real" LED number zero

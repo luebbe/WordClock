@@ -409,7 +409,7 @@ void loop()
 
   ulong _millis = millis();
 
-  // Check light level every five seconds
+  // Check light level 20 times per second
   if ((_millis - _lastLightLevelCheck >= CHECK_LIGHT_INTERVAL) || (_lastLightLevelCheck == 0))
   {
     checkLightLevel();
