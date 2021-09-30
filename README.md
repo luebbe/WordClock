@@ -1,7 +1,7 @@
 # WordClock
 
 [![Languages](https://img.shields.io/github/languages/top/luebbe/WordClock.svg?style=flat-square)](https://img.shields.io/github/languages/top/luebbe/WordClock)
-[![Codacy](https://img.shields.io/codacy/grade/e6d5e648b83b4667b399b81e2986dea6?style=flat-square)](https://app.codacy.com/gh/luebbe/WordClock/dashboard)
+[![Codacy](https://img.shields.io/codacy/grade/0410bb8900e249bbbbcdd45005ae8015?style=flat-square)](https://app.codacy.com/gh/luebbe/WordClock/dashboard)
 [![License](https://img.shields.io/github/license/mashape/apistatus.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 
 An ESP8266 based Word Clock built with PlatformIO that fetches the time from a NTP server.
