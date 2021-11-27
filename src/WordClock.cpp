@@ -160,8 +160,9 @@ void WordClock::createWords(TWORDBUF &currentWords, int &hour, int &minute)
   switch (hour)
   {
   case 1:
+    // Subtle difference in German:
     // "Es ist ein Uhr", aber "es ist fünf nach eins".
-    if (minute >= 0 && minute < 4)
+    if (minute >= 0 && minute <= 4)
     {
       currentWords.push_back(_H_EIN_);
     }
