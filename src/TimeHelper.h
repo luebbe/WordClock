@@ -21,20 +21,15 @@ bool onGetTime(int &hours, int &minutes, int &seconds)
 {
   if (!WiFi.isConnected())
     return false;
-  if (timeClient.update())
-  {
-    time_t localTime = Europe.toLocal(timeClient.getEpochTime());
 
-    hours = ((localTime % 86400L) / 3600) % 24;
-    minutes = (localTime % 3600) / 60;
-    seconds = localTime % 60;
+  timeClient.update();
+  time_t localTime = Europe.toLocal(timeClient.getEpochTime());
 
-    return true;
-  }
-  else
-  {
-    return false;
-  }
+  hours = ((localTime % 86400L) / 3600) % 24;
+  minutes = (localTime % 3600) / 60;
+  seconds = localTime % 60;
+
+  return true;
 }
 
 class Uptime

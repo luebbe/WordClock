@@ -1,7 +1,7 @@
 #include <FastLED.h>
 #include <ESP8266WiFi.h>
 #include <Ticker.h>
-#include <AsyncMqttClient.h>
+#include <espMqttClient.h>
 #include <BH1750.h>
 
 #include "OtaHelper.h"
@@ -59,9 +59,10 @@ LedEffect *_ledEffect = nullptr;
 BH1750 lightMeter;
 OtaHelper otaHelper(&ledMatrix, leds, NUM_LEDS);
 
+WordClock wordClock(&ledMatrix, leds, NUM_LEDS, onGetTime);
+
 StatusAnimation statusAnimation(&ledMatrix, leds, NUM_LEDS);
 SnakeAnimation snakeAnimation(&ledMatrix, leds, NUM_LEDS);
-WordClock wordClock(&ledMatrix, leds, NUM_LEDS, onGetTime);
 RainbowAnimation rainbowAnimation(&ledMatrix, leds, NUM_LEDS);
 BorealisAnimation borealisAnimation(&ledMatrix, leds, NUM_LEDS);
 MatrixAnimation matrixAnimation(&ledMatrix, leds, NUM_LEDS);
@@ -70,15 +71,15 @@ WiFiEventHandler wifiConnectHandler;
 WiFiEventHandler wifiDisconnectHandler;
 Ticker wifiReconnectTimer;
 
-AsyncMqttClient mqttClient;
+espMqttClient mqttClient;
 Ticker mqttReconnectTimer;
 
 uint8_t _displayMode = 0;
 bool _modeChanged = false;
-ulong _lastStatsSent = 0;
+uint64_t _lastStatsSent = 0;
 
-ulong _lastLightLevelCheck = 0;
-ulong _lastLightSent = 0;
+uint64_t _lastLightLevelCheck = 0;
+uint64_t _lastLightSent = 0;
 float _lux = NAN;
 byte _mtReg = 0;
 
@@ -145,15 +146,13 @@ void sendStats()
 
 void setMode(uint8_t mode)
 {
-  DEBUG_PRINTLN("Set Mode");
+  DEBUG_PRINTF("Set Mode %d->%d\r\n", _displayMode, mode);
 
   if ((mode <= 255) && (mode != _displayMode))
   {
     _displayMode = mode;
     _modeChanged = true;
     FastLED.clear(true);
-
-    DEBUG_PRINTF("=%d\r\n", _displayMode);
 
     switch (_displayMode)
     {
@@ -194,6 +193,8 @@ void onMqttConnect(bool sessionPresent)
   DEBUG_PRINTLN("Connected to MQTT.");
 
   statusAnimation.setStatus(CLOCK_STATUS::MQTT_CONNECTED);
+  setMode(0);
+  
   _uptimeMqtt.reset();
 
   _ledEffect = &wordClock;
@@ -212,7 +213,7 @@ void onMqttConnect(bool sessionPresent)
   sendState();
 }
 
-void onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
+void onMqttDisconnect(espMqttClientTypes::DisconnectReason reason)
 {
   DEBUG_PRINTLN("Disconnected from MQTT.");
 
@@ -223,23 +224,23 @@ void onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
   }
 }
 
-void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total)
+void onMqttMessage(const espMqttClientTypes::MessageProperties &properties, const char *topic, const uint8_t *payload, size_t len, size_t index, size_t total)
 {
-  DEBUG_PRINTF("topic: %s: ", topic);
-
   // THIS IS ONLY FOR SHORT PAYLOADS!!!
   // payload is in fact byte*, NOT char*!!!
   if (index == 0)
   {
-    std::string value;
-    value.assign((const char *)payload, len);
-
-    DEBUG_PRINTF("%s\r\n", value.c_str());
+    char *strval = new char[len + 1];
+    memcpy(strval, payload, len);
+    strval[len] = 0;
+    DEBUG_PRINTF("Message %s: %s\r\n", topic, strval);
 
     if (strcmp(topic, cModeSetTopic) == 0)
     {
-      setMode(atoi(value.c_str()));
+      setMode(atoi(strval));
     }
+
+    delete[] strval;
   }
 }
 
@@ -407,7 +408,7 @@ void loop()
     FastLED.show();
   }
 
-  ulong _millis = millis();
+  uint64_t _millis = millis();
 
   // Check light level 20 times per second
   if ((_millis - _lastLightLevelCheck >= CHECK_LIGHT_INTERVAL) || (_lastLightLevelCheck == 0))
@@ -418,6 +419,7 @@ void loop()
 
   if (WiFi.isConnected())
   {
+    mqttClient.loop();
     if (mqttClient.connected())
     {
       // Send status every 60 seconds

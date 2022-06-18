@@ -17,7 +17,7 @@ StatusAnimation::StatusAnimation(const ILedMatrix *ledMatrix, CRGB *leds, uint16
 
 bool StatusAnimation::paint(bool force)
 {
-  ulong now = millis();
+  uint64_t now = millis();
   if ((now - _lastUpdate >= UPDATE_MS) || (_lastUpdate == 0))
   {
     _lastUpdate = now;
