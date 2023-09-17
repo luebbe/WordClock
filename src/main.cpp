@@ -12,6 +12,7 @@
 #include "RainbowAnimation.h"
 #include "ArduinoBorealis.h"
 #include "MatrixAnimation.h"
+#include "MoodLight.h"
 
 #include "debugutils.h"
 #include "secrets.h"
@@ -61,6 +62,7 @@ OtaHelper otaHelper(&ledMatrix, leds, NUM_LEDS);
 
 WordClock wordClock(&ledMatrix, leds, NUM_LEDS, onGetTime);
 
+MoodLight moodLight(&ledMatrix, leds, NUM_LEDS);
 StatusAnimation statusAnimation(&ledMatrix, leds, NUM_LEDS);
 SnakeAnimation snakeAnimation(&ledMatrix, leds, NUM_LEDS);
 RainbowAnimation rainbowAnimation(&ledMatrix, leds, NUM_LEDS);
@@ -74,7 +76,7 @@ Ticker wifiReconnectTimer;
 espMqttClient mqttClient;
 Ticker mqttReconnectTimer;
 
-uint8_t _displayMode = 0;
+uint8_t _displayMode = 1;
 bool _modeChanged = false;
 uint64_t _lastStatsSent = 0;
 
@@ -114,11 +116,11 @@ Uptime _uptimeWifi;
 #define cLightlevelTopic cMqttPrefix "lightlevel"
 #define cBrightnessTopic cMqttPrefix "brightness"
 #define cModeTopic cMqttPrefix "mode"
-#define cModeSetTopic cMqttPrefix "mode/set"
+#define cModeSetTopic cModeTopic "/set"
 
 void sendState()
 {
-  DEBUG_PRINTLN("Sending State");
+  DEBUG_PRINTLN(F("Sending State"));
 
   mqttClient.publish(cBrightnessTopic, 1, true, String(FastLED.getBrightness()).c_str());
   mqttClient.publish(cModeTopic, 1, true, String(_displayMode).c_str());
@@ -127,7 +129,7 @@ void sendState()
 
 void sendStats()
 {
-  DEBUG_PRINTLN("Sending Statistics");
+  DEBUG_PRINTLN(F("Sending Statistics"));
 
   mqttClient.publish(cSignalTopic, 1, true, String(WiFi.RSSI()).c_str());
   mqttClient.publish(cHeapTopic, 1, true, String(ESP.getFreeHeap()).c_str());
@@ -148,7 +150,7 @@ void setMode(uint8_t mode)
 {
   DEBUG_PRINTF("Set Mode %d->%d\r\n", _displayMode, mode);
 
-  if ((mode <= 255) && (mode != _displayMode))
+  if (mode != _displayMode)
   {
     _displayMode = mode;
     _modeChanged = true;
@@ -157,18 +159,21 @@ void setMode(uint8_t mode)
     switch (_displayMode)
     {
     case 0:
-      _ledEffect = &wordClock;
+      _ledEffect = &moodLight;
       break;
     case 1:
-      _ledEffect = &rainbowAnimation;
+      _ledEffect = &wordClock;
       break;
     case 2:
-      _ledEffect = &borealisAnimation;
+      _ledEffect = &rainbowAnimation;
       break;
     case 3:
-      _ledEffect = &matrixAnimation;
+      _ledEffect = &borealisAnimation;
       break;
     case 4:
+      _ledEffect = &matrixAnimation;
+      break;
+    case 5:
       _ledEffect = &snakeAnimation;
       break;
     default:
@@ -182,7 +187,7 @@ void setMode(uint8_t mode)
 
 void connectToMqtt()
 {
-  DEBUG_PRINTLN("Connecting to MQTT.");
+  DEBUG_PRINTLN(F("Connecting to MQTT."));
 
   statusAnimation.setStatus(CLOCK_STATUS::MQTT_DISCONNECTED);
   mqttClient.connect();
@@ -190,11 +195,11 @@ void connectToMqtt()
 
 void onMqttConnect(bool sessionPresent)
 {
-  DEBUG_PRINTLN("Connected to MQTT.");
+  DEBUG_PRINTLN(F("Connected to MQTT."));
 
   statusAnimation.setStatus(CLOCK_STATUS::MQTT_CONNECTED);
   setMode(0);
-  
+
   _uptimeMqtt.reset();
 
   _ledEffect = &wordClock;
@@ -215,7 +220,7 @@ void onMqttConnect(bool sessionPresent)
 
 void onMqttDisconnect(espMqttClientTypes::DisconnectReason reason)
 {
-  DEBUG_PRINTLN("Disconnected from MQTT.");
+  DEBUG_PRINTLN(F("Disconnected from MQTT."));
 
   statusAnimation.setStatus(CLOCK_STATUS::MQTT_DISCONNECTED);
   if (WiFi.isConnected())
@@ -248,7 +253,7 @@ void onMqttMessage(const espMqttClientTypes::MessageProperties &properties, cons
 
 void connectToWifi()
 {
-  DEBUG_PRINTLN("Connecting to Wi-Fi.");
+  DEBUG_PRINTLN(F("Connecting to Wi-Fi."));
 
   statusAnimation.setStatus(CLOCK_STATUS::WIFI_DISCONNECTED);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
@@ -256,7 +261,7 @@ void connectToWifi()
 
 void onWifiConnect(const WiFiEventStationModeGotIP &event)
 {
-  DEBUG_PRINTLN("Connected to Wi-Fi.");
+  DEBUG_PRINTLN(F("Connected to Wi-Fi."));
 
   statusAnimation.setStatus(CLOCK_STATUS::WIFI_CONNECTED);
   _uptimeWifi.reset();
@@ -268,7 +273,7 @@ void onWifiConnect(const WiFiEventStationModeGotIP &event)
 
 void onWifiDisconnect(const WiFiEventStationModeDisconnected &event)
 {
-  DEBUG_PRINTLN("Disconnected from Wi-Fi.");
+  DEBUG_PRINTLN(F("Disconnected from Wi-Fi."));
 
   statusAnimation.setStatus(CLOCK_STATUS::WIFI_DISCONNECTED);
   mqttReconnectTimer.detach(); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
@@ -305,11 +310,11 @@ void setMTreg(uint8_t mtReg)
     lightMeter.setMTreg(mtReg);
     // if (lightMeter.setMTreg(mtReg))
     // {
-    //   // DEBUG_PRINTF("Setting MTReg to %d\r\n", mtReg);
+    //   DEBUG_PRINTF(Setting MTReg to %d\r\n", mtReg);
     // }
     // else
     // {
-    //   DEBUG_PRINTF("Error setting MTReg to %d\r\n", mtReg);
+    //   DEBUG_PRINTF(Error setting MTReg to %d\r\n", mtReg);
     // }
   }
 }
