@@ -14,12 +14,14 @@
 #include "MatrixAnimation.h"
 #include "MoodLight.h"
 
+#include "HaMqttConfigBuilder.h"
+
 #include "debugutils.h"
 #include "secrets.h"
 #include "..\include\Version.h"
 
-// #define DEBUG
 #define FW_NAME "Word Clock"
+#define FW_MANUFACTURER "Lübbe Onken"
 #define FW_VERSION VERSION
 #define FW_DATE BUILD_TIMESTAMP
 
@@ -76,7 +78,9 @@ Ticker wifiReconnectTimer;
 espMqttClient mqttClient;
 Ticker mqttReconnectTimer;
 
-uint8_t _displayMode = 1;
+String _currLight = "";
+String _currMode = "";
+String _prevMode = "";
 bool _modeChanged = false;
 uint64_t _lastStatsSent = 0;
 
@@ -90,96 +94,218 @@ Uptime _uptimeMqtt;
 Uptime _uptimeWifi;
 
 #ifdef DEBUG
-#define cMqttPrefix "wordclockdebug/"
+#define cMqttPrefix "wordclockdebug"
 #else
-#define cMqttPrefix "wordclock/"
+#define cMqttPrefix "wordclock"
 #endif
 
+// Home Assistant integration
+#define cHaDiscoveryTopic "homeassistant"
+
 // Status
-#define cIpTopic cMqttPrefix "$localip"
-#define cMacTopic cMqttPrefix "$mac"
-#define cStateTopic cMqttPrefix "$state"
-#define cFirmwareTopic cMqttPrefix "$fw/"
-#define cFirmwareName cFirmwareTopic "name"
-#define cFirmwareVersion cFirmwareTopic "version"
-#define cFirmwareDate cFirmwareTopic "date"
+#define cIpTopic cMqttPrefix "/$localip"
+#define cMacTopic cMqttPrefix "/$mac"
+#define cStateTopic "/$state"
+#define cFirmwareTopic cMqttPrefix "/$fw"
+#define cFirmwareName cFirmwareTopic "/name"
+#define cFirmwareVersion cFirmwareTopic "/version"
+#define cFirmwareDate cFirmwareTopic "/date"
+#define cPlAvailable "ready"
+#define cPlNotAvailable "lost"
 
 // Statistics
-#define cStatsTopic cMqttPrefix "$stats/"
-#define cSignalTopic cStatsTopic "signal"
-#define cHeapTopic cStatsTopic "freeheap"
-#define cUptimeTopic cStatsTopic "uptime"
-#define cUptimeWifiTopic cStatsTopic "uptimewifi"
-#define cUptimeMqttTopic cStatsTopic "uptimemqtt"
+#define cStatsTopic "/$stats"
+#define cSignal "signal"
+#define cFreeHeap "freeheap"
+#define cUptime "uptime"
+#define cUptimeWifi "uptimewifi"
+#define cUptimeMqtt "uptimemqtt"
 
 // Operation mode
-#define cLightlevelTopic cMqttPrefix "lightlevel"
-#define cBrightnessTopic cMqttPrefix "brightness"
-#define cModeTopic cMqttPrefix "mode"
-#define cModeSetTopic cModeTopic "/set"
+#define cLightlevel "lightlevel"
+#define cBrightness "brightness"
+#define cMode "mode"
+#define cModeSet cMode "/set"
+#define cLight "light"
+#define cLightSet cLight "/set"
 
-void sendState()
+void sendHAConfig(const char *confType, const char *confName, const char *config)
+{
+  const uint8_t MAX_MQTT_LENGTH = 255;
+  char mqttTopic[MAX_MQTT_LENGTH];
+  snprintf(mqttTopic, MAX_MQTT_LENGTH, cHaDiscoveryTopic "/%s/" cMqttPrefix "/%s/config", confType, confName);
+
+  mqttClient.publish(mqttTopic, 1, true, config);
+}
+
+void createHASensor(const char *deviceId, const char *device, const char *deviceClass, const char *confName, const char *statTopic, const char *confUnit, const char *confIcon)
+{
+  String config =
+      HaMqttConfigBuilder()
+          .add("name", confName)
+          .add("uniq_id", String(deviceId) + String("_") + confName)
+          .add("dev_cla", deviceClass)
+          .add("~", cMqttPrefix)
+          .add("avty_t", "~" cStateTopic)
+          .add("pl_avail", cPlAvailable)
+          .add("pl_not_avail", cPlNotAvailable)
+          .add("stat_t", statTopic)
+          .add("unit_of_meas", confUnit)
+          .add("ic", confIcon, false)
+          .addSource("dev", device)
+          .generatePayload();
+
+  sendHAConfig("sensor", confName, config.c_str());
+}
+
+void createAutoDiscovery()
+{
+  const uint8_t MAX_MAC_LENGTH = 6;
+  const uint8_t MAC_STRING_LENGTH = (MAX_MAC_LENGTH * 2) + 1;
+  const uint8_t SHRT_STRING_LENGTH = MAX_MAC_LENGTH + 1;
+
+  uint8_t mac[MAX_MAC_LENGTH];
+  char uniqueId[MAC_STRING_LENGTH];
+  char deviceId[MAC_STRING_LENGTH];
+
+  WiFi.macAddress(mac);
+  snprintf(uniqueId, MAC_STRING_LENGTH, "%02x%02x%02x%02x%02x%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+  snprintf(deviceId, SHRT_STRING_LENGTH, "%02x%02x%02x", mac[3], mac[4], mac[5]);
+
+  String device =
+      HaMqttConfigBuilder()
+          .add("ids", uniqueId)
+          .add("name", FW_NAME)
+          .add("sw", FW_VERSION)
+          .add("mf", FW_MANUFACTURER)
+          .add("mdl", "DIY")
+          .generatePayload();
+
+  // Stats sensors
+  // Free memory
+  createHASensor(deviceId, device.c_str(), "data_size", cFreeHeap, "~" cStatsTopic "/" cFreeHeap, "B", "mdi:memory");
+  // Wifi signal strength
+  createHASensor(deviceId, device.c_str(), "signal_strength", cSignal, "~" cStatsTopic "/" cSignal, "dB", "");
+  // Up time
+  createHASensor(deviceId, device.c_str(), "duration", cUptime, "~" cStatsTopic "/" cUptime, "s", "");
+
+  // Light level (sensor)
+  createHASensor(deviceId, device.c_str(), "illuminance", cLightlevel, "~/" cLightlevel, "lx", "mdi:sun-wireless");
+
+  // Brightness of the matrix (sensor)
+  createHASensor(deviceId, device.c_str(), "", cBrightness, "~/" cBrightness, "", "");
+
+  // Display mode
+  String config =
+      HaMqttConfigBuilder()
+          .add("name", "Display mode")
+          .add("uniq_id", String(deviceId) + String("_mode"))
+          .add("~", cMqttPrefix)
+          .add("avty_t", "~" cStateTopic)
+          .add("pl_avail", cPlAvailable)
+          .add("pl_not_avail", cPlNotAvailable)
+          .add("stat_t", "~/" cMode)
+          .add("cmd_t", "~/" cModeSet)
+          .addSource("options", "[\"Off\",\"Clock\",\"Rainbow\",\"Borealis\",\"Matrix\",\"Snake\"]")
+          .add("ic", "mdi:auto-fix")
+          .addSource("dev", device)
+          .generatePayload();
+
+  sendHAConfig("select", "displaymode", config.c_str());
+
+  // Light On/Off
+  config =
+      HaMqttConfigBuilder()
+          .add("name", "Light")
+          .add("uniq_id", String(deviceId) + String("_light"))
+          .add("~", cMqttPrefix)
+          .add("avty_t", "~" cStateTopic)
+          .add("pl_avail", cPlAvailable)
+          .add("pl_not_avail", cPlNotAvailable)
+          .add("stat_t", "~/" cLight)
+          .add("cmd_t", "~/" cLightSet)
+          .add("pl_off", "Off")
+          .add("pl_on", "On")
+          .addSource("dev", device)
+          .generatePayload();
+
+  sendHAConfig("light", cLight, config.c_str());
+}
+
+void sendBrightness()
 {
   DEBUG_PRINTLN(F("Sending State"));
 
-  mqttClient.publish(cBrightnessTopic, 1, true, String(FastLED.getBrightness()).c_str());
-  mqttClient.publish(cModeTopic, 1, true, String(_displayMode).c_str());
-  mqttClient.publish(cLightlevelTopic, 1, true, String(_lux).c_str());
+  mqttClient.publish(cMqttPrefix "/" cBrightness, 1, true, String(FastLED.getBrightness()).c_str());
+  mqttClient.publish(cMqttPrefix "/" cLightlevel, 1, true, String(_lux).c_str());
 }
 
 void sendStats()
 {
   DEBUG_PRINTLN(F("Sending Statistics"));
 
-  mqttClient.publish(cSignalTopic, 1, true, String(WiFi.RSSI()).c_str());
-  mqttClient.publish(cHeapTopic, 1, true, String(ESP.getFreeHeap()).c_str());
+  mqttClient.publish(cMqttPrefix cStatsTopic "/" cSignal, 1, true, String(WiFi.RSSI()).c_str());
+  mqttClient.publish(cMqttPrefix cStatsTopic "/" cFreeHeap, 1, true, String(ESP.getFreeHeap()).c_str());
 
   _uptime.update();
   _uptimeWifi.update();
   _uptimeMqtt.update();
   char statusStr[20 + 1];
   itoa(_uptime.getSeconds(), statusStr, 10);
-  mqttClient.publish(cUptimeTopic, 1, true, statusStr);
+  mqttClient.publish(cMqttPrefix cStatsTopic "/" cUptime, 1, true, statusStr);
   itoa(_uptimeWifi.getSeconds(), statusStr, 10);
-  mqttClient.publish(cUptimeWifiTopic, 1, true, statusStr);
+  mqttClient.publish(cMqttPrefix cStatsTopic "/" cUptimeWifi, 1, true, statusStr);
   itoa(_uptimeMqtt.getSeconds(), statusStr, 10);
-  mqttClient.publish(cUptimeMqttTopic, 1, true, statusStr);
+  mqttClient.publish(cMqttPrefix cStatsTopic "/" cUptimeMqtt, 1, true, statusStr);
 }
 
-void setMode(uint8_t mode)
+void setMode(String mode)
 {
-  DEBUG_PRINTF("Set Mode %d->%d\r\n", _displayMode, mode);
+  DEBUG_PRINTF("Set Mode l:%s p:%s c:%s->%s\r\n", _currLight.c_str(), _prevMode.c_str(), _currMode.c_str(), mode.c_str());
 
-  if (mode != _displayMode)
+  if (mode != _currMode)
   {
-    _displayMode = mode;
-    _modeChanged = true;
     FastLED.clear(true);
 
-    switch (_displayMode)
+    if (mode == "Off")
     {
-    case 0:
+      _prevMode = _currMode;
       _ledEffect = &moodLight;
-      break;
-    case 1:
-      _ledEffect = &wordClock;
-      break;
-    case 2:
-      _ledEffect = &rainbowAnimation;
-      break;
-    case 3:
-      _ledEffect = &borealisAnimation;
-      break;
-    case 4:
-      _ledEffect = &matrixAnimation;
-      break;
-    case 5:
-      _ledEffect = &snakeAnimation;
-      break;
-    default:
-      _ledEffect = &wordClock;
     }
-    sendState();
+    else if (mode == "Clock")
+      _ledEffect = &wordClock;
+    else if (mode == "Rainbow")
+      _ledEffect = &rainbowAnimation;
+    else if (mode == "Borealis")
+      _ledEffect = &borealisAnimation;
+    else if (mode == "Matrix")
+      _ledEffect = &matrixAnimation;
+    else if (mode == "Snake")
+      _ledEffect = &snakeAnimation;
+    else
+    {
+      _ledEffect = &wordClock;
+      mode = "Clock";
+    }
+    _currLight = (mode == "Off") ? "Off" : "On";
+    _currMode = mode;
+    _modeChanged = true;
+
+    mqttClient.publish(cMqttPrefix "/" cLight, 1, true, _currLight.c_str());
+    mqttClient.publish(cMqttPrefix "/" cMode, 1, true, _currMode.c_str());
+  }
+}
+
+void setLight(String light)
+{
+  DEBUG_PRINTF("Set Light %s\r\n", light.c_str());
+
+  if (light != _currLight)
+  {
+    if (light == "Off")
+      setMode("Off");
+    else
+      setMode(_prevMode);
   }
 }
 
@@ -198,14 +324,11 @@ void onMqttConnect(bool sessionPresent)
   DEBUG_PRINTLN(F("Connected to MQTT."));
 
   statusAnimation.setStatus(CLOCK_STATUS::MQTT_CONNECTED);
-  setMode(0);
 
   _uptimeMqtt.reset();
 
-  _ledEffect = &wordClock;
-  _modeChanged = true;
-
-  mqttClient.subscribe(cModeSetTopic, 1);
+  mqttClient.subscribe(cMqttPrefix "/" cModeSet, 1);
+  mqttClient.subscribe(cMqttPrefix "/" cLightSet, 1);
 
   mqttClient.publish(cFirmwareName, 1, true, FW_NAME);
   mqttClient.publish(cFirmwareVersion, 1, true, FW_VERSION);
@@ -213,9 +336,11 @@ void onMqttConnect(bool sessionPresent)
 
   mqttClient.publish(cIpTopic, 1, true, WiFi.localIP().toString().c_str());
   mqttClient.publish(cMacTopic, 1, true, WiFi.macAddress().c_str());
-  mqttClient.publish(cStateTopic, 1, true, "ready");
+  mqttClient.publish(cMqttPrefix cStateTopic, 1, true, cPlAvailable);
 
-  sendState();
+  createAutoDiscovery();
+
+  setMode("Clock");
 }
 
 void onMqttDisconnect(espMqttClientTypes::DisconnectReason reason)
@@ -240,10 +365,10 @@ void onMqttMessage(const espMqttClientTypes::MessageProperties &properties, cons
     strval[len] = 0;
     DEBUG_PRINTF("Message %s: %s\r\n", topic, strval);
 
-    if (strcmp(topic, cModeSetTopic) == 0)
-    {
-      setMode(atoi(strval));
-    }
+    if (strcmp(topic, cMqttPrefix "/" cModeSet) == 0)
+      setMode(strval);
+    else if (strcmp(topic, cMqttPrefix "/" cLightSet) == 0)
+      setLight(strval);
 
     delete[] strval;
   }
@@ -372,8 +497,7 @@ void setup()
   FastLED.clear(true);
 
   // Initialize random number generator
-  randomSeed(analogRead(PIN_ADC));
-  setMode(random(1, 5));
+  setMode("Rainbow");
 
   otaHelper.init();
   wordClock.init();
@@ -385,7 +509,7 @@ void setup()
   mqttClient.onDisconnect(onMqttDisconnect);
   mqttClient.onMessage(onMqttMessage);
   mqttClient.setServer(MQTT_HOST, MQTT_PORT);
-  mqttClient.setWill(cStateTopic, 1, true, "lost");
+  mqttClient.setWill(cMqttPrefix cStateTopic, 1, true, "lost");
 
   _uptime.reset();
   connectToWifi();
@@ -436,7 +560,7 @@ void loop()
       // Send state (brightness/mode) every 5 seconds
       if ((_millis - _lastLightSent >= SEND_LIGHT_INTERVAL) || (_lastLightSent == 0))
       {
-        sendState();
+        sendBrightness();
         _lastLightSent = _millis;
       }
     }
