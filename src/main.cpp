@@ -144,13 +144,13 @@ void createHASensor(const char *deviceId, const char *device, const char *device
       HaMqttConfigBuilder()
           .add("name", confName)
           .add("uniq_id", String(deviceId) + String("_") + confName)
-          .add("dev_cla", deviceClass)
+          .add("dev_cla", deviceClass, false)
           .add("~", cMqttPrefix)
           .add("avty_t", "~" cStateTopic)
           .add("pl_avail", cPlAvailable)
           .add("pl_not_avail", cPlNotAvailable)
           .add("stat_t", statTopic)
-          .add("unit_of_meas", confUnit)
+          .add("unit_of_meas", confUnit, false)
           .add("ic", confIcon, false)
           .addSource("dev", device)
           .generatePayload();
@@ -178,7 +178,7 @@ void createAutoDiscovery()
           .add("name", FW_NAME)
           .add("sw", FW_VERSION)
           .add("mf", FW_MANUFACTURER)
-          .add("mdl", "DIY")
+          .add("mdl", FW_NAME)
           .generatePayload();
 
   // Stats sensors
