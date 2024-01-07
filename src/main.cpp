@@ -17,7 +17,7 @@
 #include "HaMqttConfigBuilder.h"
 
 #include "debugutils.h"
-#include "secrets.h"
+#include "..\include\Secrets.h"
 #include "..\include\Version.h"
 
 #define FW_NAME "Word Clock"
