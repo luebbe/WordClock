@@ -21,6 +21,7 @@
 #include "..\include\Version.h"
 
 #define FW_NAME "Word Clock"
+#define FW_MODEL FW_NAME
 #define FW_MANUFACTURER "Lübbe Onken"
 #define FW_VERSION VERSION
 #define FW_DATE BUILD_TIMESTAMP
@@ -60,6 +61,7 @@ LedMatrix ledMatrix(MATRIX_WIDTH, MATRIX_HEIGHT);
 LedEffect *_ledEffect = nullptr;
 
 BH1750 lightMeter;
+
 OtaHelper otaHelper(&ledMatrix, leds, NUM_LEDS);
 
 WordClock wordClock(&ledMatrix, leds, NUM_LEDS, onGetTime);
@@ -84,6 +86,7 @@ String _prevMode = "";
 bool _modeChanged = false;
 uint64_t _lastStatsSent = 0;
 
+bool _lightMeterOK = false;
 uint64_t _lastLightLevelCheck = 0;
 uint64_t _lastLightSent = 0;
 float _lux = NAN;
@@ -94,27 +97,20 @@ Uptime _uptimeMqtt;
 Uptime _uptimeWifi;
 
 #ifdef DEBUG
-#define cMqttPrefix "wordclockdebug"
+#define cBaseTopic "debug"
 #else
-#define cMqttPrefix "wordclock"
+#define cBaseTopic "wordclock"
 #endif
 
-// Home Assistant integration
-#define cHaDiscoveryTopic "homeassistant"
-
 // Status
-#define cIpTopic cMqttPrefix "/$localip"
-#define cMacTopic cMqttPrefix "/$mac"
-#define cStateTopic "/$state"
-#define cFirmwareTopic cMqttPrefix "/$fw"
-#define cFirmwareName cFirmwareTopic "/name"
-#define cFirmwareVersion cFirmwareTopic "/version"
-#define cFirmwareDate cFirmwareTopic "/date"
-#define cPlAvailable "ready"
-#define cPlNotAvailable "lost"
+#define cIpTopic "$localip"
+#define cMacTopic "$mac"
+#define cFirmwareName "$fw/name"
+#define cFirmwareVersion "$fw/version"
+#define cFirmwareDate "$fw/date"
 
 // Statistics
-#define cStatsTopic "/$stats"
+#define cStatsTopic "$stats"
 #define cSignal "signal"
 #define cFreeHeap "freeheap"
 #define cUptime "uptime"
@@ -125,138 +121,84 @@ Uptime _uptimeWifi;
 #define cLightlevel "lightlevel"
 #define cBrightness "brightness"
 #define cMode "mode"
-#define cModeSet cMode "/set"
+#define cModeOptions "[\"Off\",\"Clock\",\"Rainbow\",\"Borealis\",\"Matrix\",\"Snake\"]"
 #define cLight "light"
-#define cLightSet cLight "/set"
 
-void sendHAConfig(const char *confType, const char *confName, const char *config)
+void sendHAConfig(const char *topic, const char *payload)
 {
-  const uint8_t MAX_MQTT_LENGTH = 255;
-  char mqttTopic[MAX_MQTT_LENGTH];
-  snprintf(mqttTopic, MAX_MQTT_LENGTH, cHaDiscoveryTopic "/%s/" cMqttPrefix "/%s/config", confType, confName);
+  DEBUG_PRINTLN(topic);
+  DEBUG_PRINTLN(payload);
 
-  mqttClient.publish(mqttTopic, 1, true, config);
-}
-
-void createHASensor(const char *deviceId, const char *device, const char *deviceClass, const char *confName, const char *statTopic, const char *confUnit, const char *confIcon)
-{
-  String config =
-      HaMqttConfigBuilder()
-          .add("name", confName)
-          .add("uniq_id", String(deviceId) + String("_") + confName)
-          .add("dev_cla", deviceClass, false)
-          .add("~", cMqttPrefix)
-          .add("avty_t", "~" cStateTopic)
-          .add("pl_avail", cPlAvailable)
-          .add("pl_not_avail", cPlNotAvailable)
-          .add("stat_t", statTopic)
-          .add("unit_of_meas", confUnit, false)
-          .add("ic", confIcon, false)
-          .addSource("dev", device)
-          .generatePayload();
-
-  sendHAConfig("sensor", confName, config.c_str());
+  mqttClient.publish(topic, 1, true, payload);
 }
 
 void createAutoDiscovery()
 {
   const uint8_t MAX_MAC_LENGTH = 6;
   const uint8_t MAC_STRING_LENGTH = (MAX_MAC_LENGTH * 2) + 1;
-  const uint8_t SHRT_STRING_LENGTH = MAX_MAC_LENGTH + 1;
 
   uint8_t mac[MAX_MAC_LENGTH];
   char uniqueId[MAC_STRING_LENGTH];
-  char deviceId[MAC_STRING_LENGTH];
 
   WiFi.macAddress(mac);
   snprintf(uniqueId, MAC_STRING_LENGTH, "%02x%02x%02x%02x%02x%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-  snprintf(deviceId, SHRT_STRING_LENGTH, "%02x%02x%02x", mac[3], mac[4], mac[5]);
 
-  String device =
-      HaMqttConfigBuilder()
-          .add("ids", uniqueId)
-          .add("name", FW_NAME)
-          .add("sw", FW_VERSION)
-          .add("mf", FW_MANUFACTURER)
-          .add("mdl", FW_NAME)
-          .generatePayload();
+  DeviceConfigBuilder *haConfig;
+
+  haConfig = new DeviceConfigBuilder(uniqueId, FW_NAME, FW_VERSION, FW_MANUFACTURER, FW_MODEL);
+  haConfig->setSendCallback(sendHAConfig)
+      .setDeviceTopic(cBaseTopic);
 
   // Stats sensors
   // Free memory
-  createHASensor(deviceId, device.c_str(), "data_size", cFreeHeap, "~" cStatsTopic "/" cFreeHeap, "B", "mdi:memory");
+  haConfig->createSensor("Free heap", cFreeHeap, cStatsTopic "/" cFreeHeap, "mdi:memory", "B", "data_size");
+
   // Wifi signal strength
-  createHASensor(deviceId, device.c_str(), "signal_strength", cSignal, "~" cStatsTopic "/" cSignal, "dB", "");
+  haConfig->createSensor("Signal strength", cSignal, cStatsTopic "/" cSignal, "mdi:wifi", "dB", "signal_strength");
+
   // Up time
-  createHASensor(deviceId, device.c_str(), "duration", cUptime, "~" cStatsTopic "/" cUptime, "s", "");
+  haConfig->createSensor("Uptime", cUptime, cStatsTopic "/" cUptime, "mdi:clock-outline", "s", "duration");
 
   // Light level (sensor)
-  createHASensor(deviceId, device.c_str(), "illuminance", cLightlevel, "~/" cLightlevel, "lx", "mdi:sun-wireless");
+  haConfig->createSensor("Light level", cLightlevel, cLightlevel, "mdi:sun-wireless", "lx", "illuminance");
 
   // Brightness of the matrix (sensor)
-  createHASensor(deviceId, device.c_str(), "", cBrightness, "~/" cBrightness, "", "");
+  haConfig->createSensor("Brightness level", cBrightness, cBrightness, "mdi:brightness-auto", "", "");
 
   // Display mode
-  String config =
-      HaMqttConfigBuilder()
-          .add("name", "Display mode")
-          .add("uniq_id", String(deviceId) + String("_mode"))
-          .add("~", cMqttPrefix)
-          .add("avty_t", "~" cStateTopic)
-          .add("pl_avail", cPlAvailable)
-          .add("pl_not_avail", cPlNotAvailable)
-          .add("stat_t", "~/" cMode)
-          .add("cmd_t", "~/" cModeSet)
-          .addSource("options", "[\"Off\",\"Clock\",\"Rainbow\",\"Borealis\",\"Matrix\",\"Snake\"]")
-          .add("ic", "mdi:auto-fix")
-          .addSource("dev", device)
-          .generatePayload();
-
-  sendHAConfig("select", "displaymode", config.c_str());
+  haConfig->createSelect("Display mode", cMode, cMode, "mdi:auto-fix", cModeOptions);
 
   // Light On/Off
-  config =
-      HaMqttConfigBuilder()
-          .add("name", "Light")
-          .add("uniq_id", String(deviceId) + String("_light"))
-          .add("~", cMqttPrefix)
-          .add("avty_t", "~" cStateTopic)
-          .add("pl_avail", cPlAvailable)
-          .add("pl_not_avail", cPlNotAvailable)
-          .add("stat_t", "~/" cLight)
-          .add("cmd_t", "~/" cLightSet)
-          .add("pl_off", "Off")
-          .add("pl_on", "On")
-          .addSource("dev", device)
-          .generatePayload();
+  haConfig->createLight("Matrix", cLight, cLight, "");
 
-  sendHAConfig("light", cLight, config.c_str());
+  delete (haConfig);
 }
 
 void sendBrightness()
 {
   DEBUG_PRINTLN(F("Sending State"));
 
-  mqttClient.publish(cMqttPrefix "/" cBrightness, 1, true, String(FastLED.getBrightness()).c_str());
-  mqttClient.publish(cMqttPrefix "/" cLightlevel, 1, true, String(_lux).c_str());
+  mqttClient.publish(cBaseTopic "/" cBrightness, 1, true, String(FastLED.getBrightness()).c_str());
+  mqttClient.publish(cBaseTopic "/" cLightlevel, 1, true, String(_lux).c_str());
 }
 
 void sendStats()
 {
   DEBUG_PRINTLN(F("Sending Statistics"));
 
-  mqttClient.publish(cMqttPrefix cStatsTopic "/" cSignal, 1, true, String(WiFi.RSSI()).c_str());
-  mqttClient.publish(cMqttPrefix cStatsTopic "/" cFreeHeap, 1, true, String(ESP.getFreeHeap()).c_str());
+  mqttClient.publish(cBaseTopic "/" cStatsTopic "/" cSignal, 1, true, String(WiFi.RSSI()).c_str());
+  mqttClient.publish(cBaseTopic "/" cStatsTopic "/" cFreeHeap, 1, true, String(ESP.getFreeHeap()).c_str());
 
   _uptime.update();
   _uptimeWifi.update();
   _uptimeMqtt.update();
   char statusStr[20 + 1];
   itoa(_uptime.getSeconds(), statusStr, 10);
-  mqttClient.publish(cMqttPrefix cStatsTopic "/" cUptime, 1, true, statusStr);
+  mqttClient.publish(cBaseTopic "/" cStatsTopic "/" cUptime, 1, true, statusStr);
   itoa(_uptimeWifi.getSeconds(), statusStr, 10);
-  mqttClient.publish(cMqttPrefix cStatsTopic "/" cUptimeWifi, 1, true, statusStr);
+  mqttClient.publish(cBaseTopic "/" cStatsTopic "/" cUptimeWifi, 1, true, statusStr);
   itoa(_uptimeMqtt.getSeconds(), statusStr, 10);
-  mqttClient.publish(cMqttPrefix cStatsTopic "/" cUptimeMqtt, 1, true, statusStr);
+  mqttClient.publish(cBaseTopic "/" cStatsTopic "/" cUptimeMqtt, 1, true, statusStr);
 }
 
 void setMode(String mode)
@@ -291,8 +233,8 @@ void setMode(String mode)
     _currMode = mode;
     _modeChanged = true;
 
-    mqttClient.publish(cMqttPrefix "/" cLight, 1, true, _currLight.c_str());
-    mqttClient.publish(cMqttPrefix "/" cMode, 1, true, _currMode.c_str());
+    mqttClient.publish(cBaseTopic "/" cLight, 1, true, _currLight.c_str());
+    mqttClient.publish(cBaseTopic "/" cMode, 1, true, _currMode.c_str());
   }
 }
 
@@ -327,16 +269,16 @@ void onMqttConnect(bool sessionPresent)
 
   _uptimeMqtt.reset();
 
-  mqttClient.subscribe(cMqttPrefix "/" cModeSet, 1);
-  mqttClient.subscribe(cMqttPrefix "/" cLightSet, 1);
+  mqttClient.subscribe(cBaseTopic "/" cMode "/set", 1);
+  mqttClient.subscribe(cBaseTopic "/" cLight "/set", 1);
 
-  mqttClient.publish(cFirmwareName, 1, true, FW_NAME);
-  mqttClient.publish(cFirmwareVersion, 1, true, FW_VERSION);
-  mqttClient.publish(cFirmwareDate, 1, true, FW_DATE);
+  mqttClient.publish(cBaseTopic "/" cFirmwareName, 1, true, FW_NAME);
+  mqttClient.publish(cBaseTopic "/" cFirmwareVersion, 1, true, FW_VERSION);
+  mqttClient.publish(cBaseTopic "/" cFirmwareDate, 1, true, FW_DATE);
 
-  mqttClient.publish(cIpTopic, 1, true, WiFi.localIP().toString().c_str());
-  mqttClient.publish(cMacTopic, 1, true, WiFi.macAddress().c_str());
-  mqttClient.publish(cMqttPrefix cStateTopic, 1, true, cPlAvailable);
+  mqttClient.publish(cBaseTopic "/" cIpTopic, 1, true, WiFi.localIP().toString().c_str());
+  mqttClient.publish(cBaseTopic "/" cMacTopic, 1, true, WiFi.macAddress().c_str());
+  mqttClient.publish(cBaseTopic "/" cAvailabilityTopic, 1, true, cPlAvailable);
 
   createAutoDiscovery();
 
@@ -365,9 +307,9 @@ void onMqttMessage(const espMqttClientTypes::MessageProperties &properties, cons
     strval[len] = 0;
     DEBUG_PRINTF("Message %s: %s\r\n", topic, strval);
 
-    if (strcmp(topic, cMqttPrefix "/" cModeSet) == 0)
+    if (strcmp(topic, cBaseTopic "/" cMode "/set") == 0)
       setMode(strval);
-    else if (strcmp(topic, cMqttPrefix "/" cLightSet) == 0)
+    else if (strcmp(topic, cBaseTopic "/" cLight "/set") == 0)
       setLight(strval);
 
     delete[] strval;
@@ -483,12 +425,15 @@ void checkLightLevel()
 void setup()
 {
   Serial.begin(SERIAL_SPEED);
-  DEBUG_PRINTLN();
-  DEBUG_PRINTLN();
+  DEBUG_PRINTF("\r\n\r\n%s %s\r\n\r\n", FW_NAME,FW_VERSION);
 
   Wire.begin(PIN_SDA, PIN_SCL);
 
-  lightMeter.begin(BH1750::CONTINUOUS_LOW_RES_MODE); // Run in Low-Res mode to allow faster sampling
+  _lightMeterOK = lightMeter.begin(BH1750::CONTINUOUS_LOW_RES_MODE); // Run in Low-Res mode to allow faster sampling
+  if (!_lightMeterOK)
+  {
+    DEBUG_PRINTLN("BH1750 sensor not found.");
+  }
 
   FastLED.addLeds<CHIPSET, PIN_LED, COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
   FastLED.setMaxPowerInVoltsAndMilliamps(5, 2000); // FastLED power management set at 5V, 2A
@@ -509,7 +454,7 @@ void setup()
   mqttClient.onDisconnect(onMqttDisconnect);
   mqttClient.onMessage(onMqttMessage);
   mqttClient.setServer(MQTT_HOST, MQTT_PORT);
-  mqttClient.setWill(cMqttPrefix cStateTopic, 1, true, "lost");
+  mqttClient.setWill(cBaseTopic "/" cAvailabilityTopic, 1, true, cPlNotAvailable);
 
   _uptime.reset();
   connectToWifi();
@@ -540,7 +485,7 @@ void loop()
   uint64_t _millis = millis();
 
   // Check light level 20 times per second
-  if ((_millis - _lastLightLevelCheck >= CHECK_LIGHT_INTERVAL) || (_lastLightLevelCheck == 0))
+  if (_lightMeterOK && ((_millis - _lastLightLevelCheck >= CHECK_LIGHT_INTERVAL) || (_lastLightLevelCheck == 0)))
   {
     checkLightLevel();
     _lastLightLevelCheck = _millis;
