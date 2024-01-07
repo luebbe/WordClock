@@ -1,6 +1,6 @@
 /*
  * Word clock using the LedMatrix base class.
- * 
+ *
  * Version: 1.0
  * Author: Lübbe Onken (http://github.com/luebbe)
  */
@@ -63,13 +63,14 @@ private:
   CRGB *_minuteLEDs; // Pointer to the start of the buffer for the minute LEDs
   CRGB *_secondLEDs; // Pointer to the start of the buffer for the second LEDs
 
-  TWORDBUF _lastWords; // Buffer for the last words that have been sent to the matrix
+  TWORDBUF _currentWords; // Buffer for the last words that have been sent to the matrix
 
   void createWords(TWORDBUF &currentWords, int &currentHour, int &currentMinute);
+  void sendWords();
   void sendWord(uint8_t index);
 
-  void updateHours(int &hours, int &minutes);
-  void updateMinutes(int &minutes);
+  void updateHours(int &hours, int &minutes, bool force);
+  void updateMinutes(int &minutes, bool force);
   void updateSeconds(int &seconds);
 
 public:

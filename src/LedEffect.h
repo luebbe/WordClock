@@ -1,7 +1,7 @@
 
 /*
  * base class to display animations on a LED strip
- * 
+ *
  * Author: Lübbe Onken (http://github.com/luebbe)
  */
 
@@ -14,8 +14,10 @@ class LedEffect
 protected:
 	CRGB *const _leds;
 	const uint16_t _numLeds;
+	CRGBPalette16 _currentPalette;
 
-	CRGB getRandomColor() const;
+	CRGB getRandomColor();
+	CRGB getColorFromPalette(uint8_t index);
 
 public:
 	explicit LedEffect(CRGB *leds, uint16_t count);
@@ -24,5 +26,8 @@ public:
 	virtual void init();
 	virtual bool paint(bool force) = 0;
 
-	// virtual operator const char *() const = 0;
+	void setPalette(CRGBPalette16 value)
+	{
+		_currentPalette = value;
+	}
 };

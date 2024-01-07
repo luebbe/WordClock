@@ -81,6 +81,7 @@ espMqttClient mqttClient;
 Ticker mqttReconnectTimer;
 
 String _currLight = "";
+String _currPalette = "";
 String _currMode = "";
 String _prevMode = "";
 bool _modeChanged = false;
@@ -123,6 +124,8 @@ Uptime _uptimeWifi;
 #define cMode "mode"
 #define cModeOptions "[\"Off\",\"Clock\",\"Rainbow\",\"Borealis\",\"Matrix\",\"Snake\"]"
 #define cLight "light"
+#define cPalette "palette"
+#define cPaletteOptions "[\"Rainbow\",\"Lava\",\"Cloud\",\"Ocean\",\"Forest\",\"Party\",\"Heat\"]"
 
 void sendHAConfig(const char *topic, const char *payload)
 {
@@ -165,11 +168,14 @@ void createAutoDiscovery()
   // Brightness of the matrix (sensor)
   haConfig->createSensor("Brightness level", cBrightness, cBrightness, "mdi:brightness-auto", "", "");
 
+  // Display On/Off
+  haConfig->createLight("Matrix", cLight, cLight, "");
+
   // Display mode
   haConfig->createSelect("Display mode", cMode, cMode, "mdi:auto-fix", cModeOptions);
 
-  // Light On/Off
-  haConfig->createLight("Matrix", cLight, cLight, "");
+  // Color palette for word clock
+  haConfig->createSelect("Color palette", cPalette, cPalette, "mdi:palette", cPaletteOptions);
 
   delete (haConfig);
 }
@@ -238,6 +244,40 @@ void setMode(String mode)
   }
 }
 
+void setPalette(String palette)
+{
+  // Color palette is up to now only used for the word clock
+  DEBUG_PRINTF("Palette:%s->%s\r\n", _currPalette.c_str(), palette.c_str());
+
+  if (palette != _currPalette)
+  {
+    if (palette == "Rainbow")
+      wordClock.setPalette(RainbowColors_p);
+    else if (palette == "Lava")
+      wordClock.setPalette(LavaColors_p);
+    else if (palette == "Cloud")
+      wordClock.setPalette(CloudColors_p);
+    else if (palette == "Ocean")
+      wordClock.setPalette(OceanColors_p);
+    else if (palette == "Forest")
+      wordClock.setPalette(ForestColors_p);
+    else if (palette == "Party")
+      wordClock.setPalette(PartyColors_p);
+    else if (palette == "Heat")
+      wordClock.setPalette(HeatColors_p);
+    else
+      wordClock.setPalette(RainbowColors_p);
+
+  DEBUG_PRINTF("Palette:%s->%s\r\n", _currPalette.c_str(), palette.c_str());
+
+    _currPalette = palette;
+
+    wordClock.paint(true);
+
+    mqttClient.publish(cBaseTopic "/" cPalette, 1, true, _currPalette.c_str());
+  }
+}
+
 void setLight(String light)
 {
   DEBUG_PRINTF("Set Light %s\r\n", light.c_str());
@@ -271,6 +311,7 @@ void onMqttConnect(bool sessionPresent)
 
   mqttClient.subscribe(cBaseTopic "/" cMode "/set", 1);
   mqttClient.subscribe(cBaseTopic "/" cLight "/set", 1);
+  mqttClient.subscribe(cBaseTopic "/" cPalette "/set", 1);
 
   mqttClient.publish(cBaseTopic "/" cFirmwareName, 1, true, FW_NAME);
   mqttClient.publish(cBaseTopic "/" cFirmwareVersion, 1, true, FW_VERSION);
@@ -282,6 +323,7 @@ void onMqttConnect(bool sessionPresent)
 
   createAutoDiscovery();
 
+  setPalette("Rainbow");
   setMode("Clock");
 }
 
@@ -307,10 +349,12 @@ void onMqttMessage(const espMqttClientTypes::MessageProperties &properties, cons
     strval[len] = 0;
     DEBUG_PRINTF("Message %s: %s\r\n", topic, strval);
 
-    if (strcmp(topic, cBaseTopic "/" cMode "/set") == 0)
-      setMode(strval);
-    else if (strcmp(topic, cBaseTopic "/" cLight "/set") == 0)
+    if (strcmp(topic, cBaseTopic "/" cLight "/set") == 0)
       setLight(strval);
+    else if (strcmp(topic, cBaseTopic "/" cMode "/set") == 0)
+      setMode(strval);
+    else if (strcmp(topic, cBaseTopic "/" cPalette "/set") == 0)
+      setPalette(strval);
 
     delete[] strval;
   }
@@ -425,7 +469,7 @@ void checkLightLevel()
 void setup()
 {
   Serial.begin(SERIAL_SPEED);
-  DEBUG_PRINTF("\r\n\r\n%s %s\r\n\r\n", FW_NAME,FW_VERSION);
+  DEBUG_PRINTF("\r\n\r\n%s %s\r\n\r\n", FW_NAME, FW_VERSION);
 
   Wire.begin(PIN_SDA, PIN_SCL);
 

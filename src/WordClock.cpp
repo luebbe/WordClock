@@ -1,6 +1,6 @@
 /*
  * Word clock using the LedMatrix base class.
- * 
+ *
  * Version: 1.0
  * Author: Lübbe Onken (http://github.com/luebbe)
  */
@@ -16,7 +16,7 @@ WordClock::WordClock(const ILedMatrix *ledMatrix, CRGB *leds, uint16_t count, TG
       _useThreeQuarters(false),
       _lastUpdate(0)
 {
-  _lastWords.clear();
+  _currentWords.clear();
   _minuteLEDs = (_leds + _ledMatrix->getCount()); // Pointer to the start of the buffer for the minute LEDs
   _secondLEDs = (_minuteLEDs + MINUTE_LEDS);      // Pointer to the start of the buffer for the second LEDs
 }
@@ -30,14 +30,9 @@ void WordClock::init()
 bool WordClock::paint(bool force)
 {
   uint64_t now = millis();
-  if ((now - _lastUpdate >= UPDATE_MS) || (_lastUpdate == 0))
+  if (force || (now - _lastUpdate >= UPDATE_MS) || (_lastUpdate == 0))
   {
     _lastUpdate = now;
-
-    if (force)
-    {
-      _lastWords.clear();
-    }
 
     int hours;
     int minutes;
@@ -59,8 +54,8 @@ bool WordClock::paint(bool force)
       minutes = (minutes + minuteOffset) % 60;
 #endif
 
-      updateHours(hours, minutes);
-      updateMinutes(minutes);
+      updateHours(hours, minutes, force);
+      updateMinutes(minutes, force);
       updateSeconds(seconds);
       return true;
     }
@@ -68,87 +63,87 @@ bool WordClock::paint(bool force)
   return false;
 }
 
-void WordClock::createWords(TWORDBUF &currentWords, int &hour, int &minute)
+void WordClock::createWords(TWORDBUF &newWords, int &hour, int &minute)
 {
   // The order of the word indexes in the array is not the order of the words on the display.
-  currentWords.clear();
-  currentWords.push_back(_O_ES_);
-  currentWords.push_back(_O_IST_);
+  newWords.clear();
+  newWords.push_back(_O_ES_);
+  newWords.push_back(_O_IST_);
 
   switch (minute)
   {
   case 0 ... 4:
     // This places "o'clock" before the hour in the output array, but it's only visible in the debug output.
-    currentWords.push_back(_O_UHR_);
+    newWords.push_back(_O_UHR_);
     break;
   case 5 ... 9:
-    currentWords.push_back(_M_FUENF_);
-    currentWords.push_back(_O_NACH_);
+    newWords.push_back(_M_FUENF_);
+    newWords.push_back(_O_NACH_);
     break;
   case 10 ... 14:
-    currentWords.push_back(_M_ZEHN_);
-    currentWords.push_back(_O_NACH_);
+    newWords.push_back(_M_ZEHN_);
+    newWords.push_back(_O_NACH_);
     break;
   case 15 ... 19:
     if (_useThreeQuarters)
     {
       // Use "quarter hh+1" for hh:15
-      currentWords.push_back(_M_VIERTEL_);
+      newWords.push_back(_M_VIERTEL_);
     }
     else
     {
       // Use "quarter past hh" for hh:15
-      currentWords.push_back(_M_VIERTEL_);
-      currentWords.push_back(_O_NACH_);
+      newWords.push_back(_M_VIERTEL_);
+      newWords.push_back(_O_NACH_);
     }
     break;
   case 20 ... 24:
-    currentWords.push_back(_M_ZWANZIG_);
-    currentWords.push_back(_O_NACH_);
+    newWords.push_back(_M_ZWANZIG_);
+    newWords.push_back(_O_NACH_);
     break;
   case 25 ... 29:
-    currentWords.push_back(_M_FUENF_);
-    currentWords.push_back(_O_VOR_);
-    currentWords.push_back(_M_HALB_);
+    newWords.push_back(_M_FUENF_);
+    newWords.push_back(_O_VOR_);
+    newWords.push_back(_M_HALB_);
     hour += 1;
     break;
   case 30 ... 34:
-    currentWords.push_back(_M_HALB_);
+    newWords.push_back(_M_HALB_);
     hour += 1;
     break;
   case 35 ... 39:
-    currentWords.push_back(_M_FUENF_);
-    currentWords.push_back(_O_NACH_);
-    currentWords.push_back(_M_HALB_);
+    newWords.push_back(_M_FUENF_);
+    newWords.push_back(_O_NACH_);
+    newWords.push_back(_M_HALB_);
     hour += 1;
     break;
   case 40 ... 44:
-    currentWords.push_back(_M_ZWANZIG_);
-    currentWords.push_back(_O_VOR_);
+    newWords.push_back(_M_ZWANZIG_);
+    newWords.push_back(_O_VOR_);
     hour += 1;
     break;
   case 45 ... 49:
     if (_useThreeQuarters)
     {
       // Use "three quarters hh+1" for hh:45
-      currentWords.push_back(_M_DREIVIERTEL_);
+      newWords.push_back(_M_DREIVIERTEL_);
     }
     else
     {
       // Use "quarter to hh+1" for hh:45
-      currentWords.push_back(_M_VIERTEL_);
-      currentWords.push_back(_O_VOR_);
+      newWords.push_back(_M_VIERTEL_);
+      newWords.push_back(_O_VOR_);
     }
     hour += 1;
     break;
   case 50 ... 54:
-    currentWords.push_back(_M_ZEHN_);
-    currentWords.push_back(_O_VOR_);
+    newWords.push_back(_M_ZEHN_);
+    newWords.push_back(_O_VOR_);
     hour += 1;
     break;
   case 55 ... 59:
-    currentWords.push_back(_M_FUENF_);
-    currentWords.push_back(_O_VOR_);
+    newWords.push_back(_M_FUENF_);
+    newWords.push_back(_O_VOR_);
     hour += 1;
     break;
   }
@@ -164,92 +159,89 @@ void WordClock::createWords(TWORDBUF &currentWords, int &hour, int &minute)
     // "Es ist ein Uhr", aber "es ist fünf nach eins".
     if (minute >= 0 && minute <= 4)
     {
-      currentWords.push_back(_H_EIN_);
+      newWords.push_back(_H_EIN_);
     }
     else
     {
-      currentWords.push_back(_H_EINS_);
+      newWords.push_back(_H_EINS_);
     }
     break;
   case 2:
-    currentWords.push_back(_H_ZWEI_);
+    newWords.push_back(_H_ZWEI_);
     break;
   case 3:
-    currentWords.push_back(_H_DREI_);
+    newWords.push_back(_H_DREI_);
     break;
   case 4:
-    currentWords.push_back(_H_VIER_);
+    newWords.push_back(_H_VIER_);
     break;
   case 5:
-    currentWords.push_back(_H_FUENF_);
+    newWords.push_back(_H_FUENF_);
     break;
   case 6:
-    currentWords.push_back(_H_SECHS_);
+    newWords.push_back(_H_SECHS_);
     break;
   case 7:
-    currentWords.push_back(_H_SIEBEN_);
+    newWords.push_back(_H_SIEBEN_);
     break;
   case 8:
-    currentWords.push_back(_H_ACHT_);
+    newWords.push_back(_H_ACHT_);
     break;
   case 9:
-    currentWords.push_back(_H_NEUN_);
+    newWords.push_back(_H_NEUN_);
     break;
   case 10:
-    currentWords.push_back(_H_ZEHN_);
+    newWords.push_back(_H_ZEHN_);
     break;
   case 11:
-    currentWords.push_back(_H_ELF_);
+    newWords.push_back(_H_ELF_);
     break;
   case 12:
-    currentWords.push_back(_H_ZWOELF_);
+    newWords.push_back(_H_ZWOELF_);
     break;
   default:
-    currentWords.push_back(_H_ZWOELF_);
+    newWords.push_back(_H_ZWOELF_);
     break;
   }
 }
 
-void WordClock::updateHours(int &hours, int &minutes)
+void WordClock::updateHours(int &hours, int &minutes, bool force)
 {
-  TWORDBUF currentWords;
+  TWORDBUF newWords;
 
-  createWords(currentWords, hours, minutes);
+  if (force)
+    _currentWords.clear();
+
+  createWords(newWords, hours, minutes);
 
   // Update the LED matrix if the values have changed
-  if (_lastWords != currentWords)
+  if (_currentWords != newWords)
   {
-    DEBUG_PRINTF("%02d:%02d sending %d words:", hours, minutes, currentWords.size());
+    DEBUG_PRINTF("%02d:%02d sending %d words:", hours, minutes, newWords.size());
 
-    memset8(_leds, 0, sizeof(struct CRGB) * _ledMatrix->getCount());
-    for (size_t i = 0; i < currentWords.size(); i++)
-    {
-      sendWord(currentWords[i]);
-    }
-    _lastWords = currentWords;
+    _currentWords = newWords;
+    sendWords();
 
     DEBUG_PRINTF("\r\n");
   }
 }
 
-void WordClock::updateMinutes(int &minutes)
+void WordClock::updateMinutes(int &minutes, bool force)
 {
 // Always update the minute LEDs if available
 #ifdef HAS_MINUTES
   int minuteIndex = (minutes % 5) - 1;
-  if (minuteIndex == -1)
+  if (force || (minuteIndex == -1))
   {
     // Erase buffer in minute 0 of 5 and pick a color for all minute LEDs
     memset8(_minuteLEDs, 0, sizeof(struct CRGB) * MINUTE_LEDS);
     _minuteColor = getRandomColor();
   }
-  else
+
+  // Set the color for all minutes up to the current minute
+  for (int i = 0; i <= minuteIndex; i++)
   {
-    // Set the color for all minutes up to the current minute
-    for (int i = 0; i <= minuteIndex; i++)
-    {
-      _minuteLEDs[i] = _minuteColor;
-    }
+    _minuteLEDs[i] = _minuteColor;
   }
 #endif
 }
@@ -257,30 +249,43 @@ void WordClock::updateMinutes(int &minutes)
 void WordClock::updateSeconds(int &seconds)
 {
 #ifdef HAS_SECONDS
-  static bool getColor = true;
+  static bool resetBuffer = true;
   int secondIndex = (seconds * SECOND_LEDS / 60);
 
   // Erase buffer in second 0 and pick a new color for all LEDs for the next minute
-  if (secondIndex == 0)
+  if ((secondIndex == 0) && resetBuffer)
   {
-    if (getColor)
-    {
-      memset8(_secondLEDs, 0, sizeof(struct CRGB) * SECOND_LEDS);
-      _secondColor = getRandomColor();
-      getColor = false; // get a new color only once during the first second
-    }
+    // Clear all second LEDs
+    memset8(_secondLEDs, 0, sizeof(struct CRGB) * SECOND_LEDS);
+    resetBuffer = false;
+    // _secondColor = getRandomColor();  // get a new color only once during the first second
   }
   else
   {
-    getColor = true;
+    resetBuffer = true;
   }
 
-  // Now add the offset for the "real" LED number zero
-  secondIndex = (secondIndex + SECOND_OFFSET) % SECOND_LEDS;
+  // Fill all LEDs starting from zero.
+  for (int i = 0; i < secondIndex; i++)
+  {
+    _secondColor = getColorFromPalette(i * 4);
 
-  // This fills the second LEDs with the color
-  _secondLEDs[secondIndex] = _secondColor;
+    // Now add the offset for the "real" LED number zero
+    int ledIndex = (i + SECOND_OFFSET) % SECOND_LEDS;
+
+    // This fills the second LEDs with the color
+    _secondLEDs[ledIndex] = _secondColor;
+  }
 #endif
+}
+
+void WordClock::sendWords()
+{
+  memset8(_leds, 0, sizeof(struct CRGB) * _ledMatrix->getCount());
+  for (size_t i = 0; i < _currentWords.size(); i++)
+  {
+    sendWord(_currentWords[i]);
+  }
 }
 
 void WordClock::sendWord(uint8_t index)
