@@ -89,6 +89,7 @@ void WordClock::createWords(TWORDBUF &newWords, int &hour, int &minute)
     {
       // Use "quarter hh+1" for hh:15
       newWords.push_back(_M_VIERTEL_);
+      hour += 1;
     }
     else
     {
