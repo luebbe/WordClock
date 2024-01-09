@@ -265,8 +265,8 @@ void WordClock::updateSeconds(int &seconds)
     resetBuffer = true;
   }
 
-  // Fill all LEDs starting from zero.
-  for (int i = 0; i < secondIndex; i++)
+  // Fill all LEDs starting from zero. secondIndex is the last LED to be lit.
+  for (int i = 0; i <= secondIndex; i++)
   {
     _secondColor = getColorFromPalette(i * 4);
 

@@ -126,6 +126,7 @@ Uptime _uptimeWifi;
 #define cLight "light"
 #define cPalette "palette"
 #define cPaletteOptions "[\"Rainbow\",\"Lava\",\"Cloud\",\"Ocean\",\"Forest\",\"Party\",\"Heat\"]"
+#define cThreeQuarters "threequarters"
 
 void sendHAConfig(const char *topic, const char *payload)
 {
@@ -268,7 +269,7 @@ void setPalette(String palette)
     else
       wordClock.setPalette(RainbowColors_p);
 
-  DEBUG_PRINTF("Palette:%s->%s\r\n", _currPalette.c_str(), palette.c_str());
+    DEBUG_PRINTF("Palette:%s->%s\r\n", _currPalette.c_str(), palette.c_str());
 
     _currPalette = palette;
 
@@ -278,16 +279,26 @@ void setPalette(String palette)
   }
 }
 
-void setLight(String light)
+void setLight(String cmd)
 {
-  DEBUG_PRINTF("Set Light %s\r\n", light.c_str());
+  DEBUG_PRINTF("Set Light %s\r\n", cmd.c_str());
 
-  if (light != _currLight)
+  if (cmd != _currLight)
   {
-    if (light == "Off")
+    if (cmd == "Off")
       setMode("Off");
     else
       setMode(_prevMode);
+  }
+}
+
+void setThreeQuarters(String cmd)
+{
+  bool on = (cmd == "On");
+  if (on != wordClock.getUseThreeQuarters())
+  {
+    wordClock.setUseThreeQuarters(on);
+    mqttClient.publish(cBaseTopic "/" cThreeQuarters, 1, true, on ? "On" : "Off");
   }
 }
 
@@ -312,6 +323,7 @@ void onMqttConnect(bool sessionPresent)
   mqttClient.subscribe(cBaseTopic "/" cMode "/set", 1);
   mqttClient.subscribe(cBaseTopic "/" cLight "/set", 1);
   mqttClient.subscribe(cBaseTopic "/" cPalette "/set", 1);
+  mqttClient.subscribe(cBaseTopic "/" cThreeQuarters "/set", 1);
 
   mqttClient.publish(cBaseTopic "/" cFirmwareName, 1, true, FW_NAME);
   mqttClient.publish(cBaseTopic "/" cFirmwareVersion, 1, true, FW_VERSION);
@@ -325,6 +337,7 @@ void onMqttConnect(bool sessionPresent)
 
   setPalette("Rainbow");
   setMode("Clock");
+  setThreeQuarters("Off");
 }
 
 void onMqttDisconnect(espMqttClientTypes::DisconnectReason reason)
@@ -355,6 +368,8 @@ void onMqttMessage(const espMqttClientTypes::MessageProperties &properties, cons
       setMode(strval);
     else if (strcmp(topic, cBaseTopic "/" cPalette "/set") == 0)
       setPalette(strval);
+    else if (strcmp(topic, cBaseTopic "/" cThreeQuarters "/set") == 0)
+      setThreeQuarters(strval);
 
     delete[] strval;
   }
@@ -474,10 +489,7 @@ void setup()
   Wire.begin(PIN_SDA, PIN_SCL);
 
   _lightMeterOK = lightMeter.begin(BH1750::CONTINUOUS_LOW_RES_MODE); // Run in Low-Res mode to allow faster sampling
-  if (!_lightMeterOK)
-  {
-    DEBUG_PRINTLN("BH1750 sensor not found.");
-  }
+  DEBUG_PRINTF("BH1750 sensor %s\r\n", _lightMeterOK ? "found" : "not found");
 
   FastLED.addLeds<CHIPSET, PIN_LED, COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
   FastLED.setMaxPowerInVoltsAndMilliamps(5, 2000); // FastLED power management set at 5V, 2A

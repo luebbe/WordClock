@@ -80,6 +80,7 @@ public:
   bool paint(bool force) override;
 
   void setUseThreeQuarters(bool value) { _useThreeQuarters = value; }
+  bool getUseThreeQuarters() { return _useThreeQuarters; }
 };
 
 enum TWORDS
