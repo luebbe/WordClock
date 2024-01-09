@@ -253,27 +253,25 @@ void setPalette(String palette)
   if (palette != _currPalette)
   {
     if (palette == "Rainbow")
-      wordClock.setPalette(RainbowColors_p);
+      _ledEffect->setPalette(RainbowColors_p);
     else if (palette == "Lava")
-      wordClock.setPalette(LavaColors_p);
+      _ledEffect->setPalette(LavaColors_p);
     else if (palette == "Cloud")
-      wordClock.setPalette(CloudColors_p);
+      _ledEffect->setPalette(CloudColors_p);
     else if (palette == "Ocean")
-      wordClock.setPalette(OceanColors_p);
+      _ledEffect->setPalette(OceanColors_p);
     else if (palette == "Forest")
-      wordClock.setPalette(ForestColors_p);
+      _ledEffect->setPalette(ForestColors_p);
     else if (palette == "Party")
-      wordClock.setPalette(PartyColors_p);
+      _ledEffect->setPalette(PartyColors_p);
     else if (palette == "Heat")
-      wordClock.setPalette(HeatColors_p);
+      _ledEffect->setPalette(HeatColors_p);
     else
-      wordClock.setPalette(RainbowColors_p);
+      _ledEffect->setPalette(RainbowColors_p);
 
     DEBUG_PRINTF("Palette:%s->%s\r\n", _currPalette.c_str(), palette.c_str());
 
     _currPalette = palette;
-
-    wordClock.paint(true);
 
     mqttClient.publish(cBaseTopic "/" cPalette, 1, true, _currPalette.c_str());
   }
@@ -295,11 +293,8 @@ void setLight(String cmd)
 void setThreeQuarters(String cmd)
 {
   bool on = (cmd == "On");
-  if (on != wordClock.getUseThreeQuarters())
-  {
-    wordClock.setUseThreeQuarters(on);
-    mqttClient.publish(cBaseTopic "/" cThreeQuarters, 1, true, on ? "On" : "Off");
-  }
+  wordClock.setUseThreeQuarters(on);
+  mqttClient.publish(cBaseTopic "/" cThreeQuarters, 1, true, on ? "On" : "Off");
 }
 
 // MQTT connection and event handling

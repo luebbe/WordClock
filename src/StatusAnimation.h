@@ -11,7 +11,6 @@
 #include "LedMatrix.h"
 
 #define MINUTE_LEDS 4 // One LED in each corner for minutes 1..4
-#define UPDATE_MS 50 // Update 20 times per second
 
 enum CLOCK_STATUS
 {

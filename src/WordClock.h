@@ -43,8 +43,6 @@
 #define SECOND_OFFSET 0
 #endif
 
-#define UPDATE_MS 50 // Update the display 20 times per second in order to follow the brightness changes quicker
-
 typedef std::function<bool(int &hours, int &minutes, int &seconds)> TGetTimeFunction;
 
 class WordClock : public LedEffect

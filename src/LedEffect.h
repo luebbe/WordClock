@@ -9,6 +9,8 @@
 
 #include <FastLED.h>
 
+#define UPDATE_MS 50 // Update the display 20 times per second in order to follow the brightness changes quicker
+
 class LedEffect
 {
 protected:
@@ -29,5 +31,6 @@ public:
 	void setPalette(CRGBPalette16 value)
 	{
 		_currentPalette = value;
+		paint(true);
 	}
 };
