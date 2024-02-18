@@ -3,6 +3,8 @@
 #include <Ticker.h>
 #include <espMqttClient.h>
 #include <BH1750.h>
+#include <MedianFilterLib.h>
+#include <MeanFilterLib.h>
 
 #include "OtaHelper.h"
 #include "TimeHelper.h"
@@ -50,6 +52,9 @@
 #define SEND_LIGHT_INTERVAL 5000UL  // Send light level every 5 seconds
 #define CHECK_LIGHT_INTERVAL 50UL   // Check light level 20 times per second
 
+#define MEDIAN_WND 7 // A median filter window size of seven should be enough to filter out most spikes
+#define MEAN_WND 7   // After filtering the spikes we don't need many samples anymore for the average
+
 // Params for width, height and number of extra LEDs are defined in WordClock.h
 #define NUM_LEDS (MATRIX_WIDTH * MATRIX_HEIGHT) + MINUTE_LEDS + SECOND_LEDS
 #define FIRST_MINUTE (MATRIX_WIDTH * MATRIX_HEIGHT)
@@ -61,6 +66,9 @@ LedMatrix ledMatrix(MATRIX_WIDTH, MATRIX_HEIGHT);
 LedEffect *_ledEffect = nullptr;
 
 BH1750 lightMeter;
+
+MedianFilter<float> medianFilterLDR(MEDIAN_WND);
+MeanFilter<float> meanFilterLDR(MEAN_WND);
 
 OtaHelper otaHelper(&ledMatrix, leds, NUM_LEDS);
 
@@ -85,6 +93,7 @@ String _currPalette = "";
 String _currMode = "";
 String _prevMode = "";
 bool _modeChanged = false;
+bool _initialized = false;
 uint64_t _lastStatsSent = 0;
 
 bool _lightMeterOK = false;
@@ -290,9 +299,8 @@ void setLight(String cmd)
   }
 }
 
-void setThreeQuarters(String cmd)
+void setThreeQuarters(bool on)
 {
-  bool on = (cmd == "On");
   wordClock.setUseThreeQuarters(on);
   mqttClient.publish(cBaseTopic "/" cThreeQuarters, 1, true, on ? "On" : "Off");
 }
@@ -330,9 +338,12 @@ void onMqttConnect(bool sessionPresent)
 
   createAutoDiscovery();
 
-  setPalette("Rainbow");
-  setMode("Clock");
-  setThreeQuarters("Off");
+  // Set palette and mode to force sending their status to MQTT
+  // Default values on first connect
+  setPalette(_initialized ? _currPalette : "Rainbow");
+  setMode(_initialized ? _currMode : "Clock");
+  setThreeQuarters(wordClock.getUseThreeQuarters());
+  _initialized = true;
 }
 
 void onMqttDisconnect(espMqttClientTypes::DisconnectReason reason)
@@ -364,7 +375,7 @@ void onMqttMessage(const espMqttClientTypes::MessageProperties &properties, cons
     else if (strcmp(topic, cBaseTopic "/" cPalette "/set") == 0)
       setPalette(strval);
     else if (strcmp(topic, cBaseTopic "/" cThreeQuarters "/set") == 0)
-      setThreeQuarters(strval);
+      setThreeQuarters((strcmp(strval, "On") == 0) || (strcmp(strval, "on") == 0) || (strcmp(strval, "1") == 0));
 
     delete[] strval;
   }
@@ -411,6 +422,9 @@ void adjustBrightness(float lux)
   {
     lux = DAYLIGHT_LUX;
   }
+
+  // Apply filtering to get rid of spikes
+  lux = meanFilterLDR.AddValue(medianFilterLDR.AddValue(lux));
 
   // scale to 1..255
   uint8_t brightness = round(lux * 255 / DAYLIGHT_LUX);

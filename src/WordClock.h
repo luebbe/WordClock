@@ -53,9 +53,9 @@ private:
   const ILedMatrix *_ledMatrix;
 
   TGetTimeFunction _onGetTime;
-  CRGB _minuteColor;      // Color for the minute LEDs
-  CRGB _secondColor;      // Color for the second LEDs
-  bool _useThreeQuarters; // Use "quarter to"/"quarter past" or "quarter"/"three quarters" depending on region
+  CRGB _minuteColor;              // Color for the minute LEDs
+  CRGB _secondColor;              // Color for the second LEDs
+  bool _useThreeQuarters = false; // Use "quarter to"/"quarter past" or "quarter"/"three quarters" depending on region
   unsigned long _lastUpdate;
 
   CRGB *_minuteLEDs; // Pointer to the start of the buffer for the minute LEDs

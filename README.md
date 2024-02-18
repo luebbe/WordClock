@@ -7,6 +7,7 @@
 An ESP8266 based Word Clock built with PlatformIO that fetches the time from a NTP server.
 
 This is firmware for the 11x10 LED Matrix word clock case from [WordClock 12h (desk clock edition) from Thingiverse](https://www.thingiverse.com/thing:2130830).
+It features MQTT autodiscovery for Home Assistant
 
 It currently has three modes:
 
@@ -34,7 +35,8 @@ Dependencies are:
 - NtpClient
 - Time
 - TimeZone
-- AsyncMqttClient
+- espMqttClient
+- HaMqttConfigBuilder
 
 If you build the firmware using PlatformIO, all dependencies are pulled in automatically. If you prefer a different IDE you have to take care of everything yourself.
 
