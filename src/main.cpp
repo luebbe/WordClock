@@ -187,6 +187,9 @@ void createAutoDiscovery()
   // Color palette for word clock
   haConfig->createSelect("Color palette", cPalette, cPalette, "mdi:palette", cPaletteOptions);
 
+  // Swabian/Northen German time
+  haConfig->createSwitch("Swabian time", cThreeQuarters, cThreeQuarters, "");
+
   delete (haConfig);
 }
 
