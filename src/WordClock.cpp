@@ -269,7 +269,7 @@ void WordClock::updateSeconds(int &seconds)
   // Fill all LEDs starting from zero. secondIndex is the last LED to be lit.
   for (int i = 0; i <= secondIndex; i++)
   {
-    _secondColor = getColorFromPalette(i * 4);
+    _secondColor = getColorFromPalette(255 * i / 60);
 
     // Now add the offset for the "real" LED number zero
     int ledIndex = (i + SECOND_OFFSET) % SECOND_LEDS;
