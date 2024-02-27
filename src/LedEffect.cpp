@@ -21,6 +21,15 @@ void LedEffect::init()
   memset8((void *)_leds, 0, sizeof(struct CRGB) * _numLeds);
 }
 
+void LedEffect::createRandomPalette()
+{
+  _randomPalette = CRGBPalette16(
+      CHSV(random8(), 255, 255),
+      CHSV(random8(), 255, 255),
+      CHSV(random8(), 128, 255), // One color with less saturation
+      CHSV(random8(), 255, 255));
+}
+
 CRGB LedEffect::getColorFromPalette(uint8_t index)
 {
   return ColorFromPalette(_currentPalette, index);

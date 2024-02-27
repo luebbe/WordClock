@@ -54,6 +54,11 @@ bool WordClock::paint(bool force)
       minutes = (minutes + minuteOffset) % 60;
 #endif
 
+      if (minutes == 0)
+      {
+        createRandomPalette();
+      }
+
       updateHours(hours, minutes, force);
       updateMinutes(minutes, force);
       updateSeconds(seconds);

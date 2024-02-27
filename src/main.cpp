@@ -48,9 +48,9 @@
 // The LEDs will reach maximum brightness at this lux level and above.
 #define DAYLIGHT_LUX 2500
 
-#define SEND_STATS_INTERVAL 60000UL // Send stats every 60 seconds
-#define SEND_LIGHT_INTERVAL 5000UL  // Send light level every 5 seconds
-#define CHECK_LIGHT_INTERVAL 50UL   // Check light level 20 times per second
+#define SEND_STATS_INTERVAL 60 * 1000UL         // Send stats every 60 seconds
+#define SEND_LIGHT_INTERVAL 5 * 1000UL          // Send light level every 5 seconds
+#define CHECK_LIGHT_INTERVAL 50UL               // Check light level 20 times per second
 
 #define MEDIAN_WND 7 // A median filter window size of seven should be enough to filter out most spikes
 #define MEAN_WND 7   // After filtering the spikes we don't need many samples anymore for the average
@@ -134,7 +134,7 @@ Uptime _uptimeWifi;
 #define cModeOptions "[\"Off\",\"Clock\",\"Rainbow\",\"Borealis\",\"Matrix\",\"Snake\"]"
 #define cLight "light"
 #define cPalette "palette"
-#define cPaletteOptions "[\"Rainbow\",\"Lava\",\"Cloud\",\"Ocean\",\"Forest\",\"Party\",\"Heat\"]"
+#define cPaletteOptions "[\"Rainbow\",\"Lava\",\"Cloud\",\"Ocean\",\"Forest\",\"Party\",\"Heat\",\"Random\"]"
 #define cThreeQuarters "threequarters"
 
 void sendHAConfig(const char *topic, const char *payload)
@@ -279,7 +279,7 @@ void setPalette(String palette)
     else if (palette == "Heat")
       _ledEffect->setPalette(HeatColors_p);
     else
-      _ledEffect->setPalette(RainbowColors_p);
+      _ledEffect->setRandomPalette();
 
     DEBUG_PRINTF("Palette:%s->%s\r\n", _currPalette.c_str(), palette.c_str());
 

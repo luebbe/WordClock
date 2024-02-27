@@ -17,6 +17,7 @@ protected:
 	CRGB *const _leds;
 	const uint16_t _numLeds;
 	CRGBPalette16 _currentPalette;
+	CRGBPalette16 _randomPalette;
 
 	CRGB getRandomColor();
 	CRGB getColorFromPalette(uint8_t index);
@@ -28,9 +29,18 @@ public:
 	virtual void init();
 	virtual bool paint(bool force) = 0;
 
+	void createRandomPalette();
+
 	void setPalette(CRGBPalette16 value)
 	{
 		_currentPalette = value;
 		paint(true);
+	}
+
+	void setRandomPalette()
+	{
+		// Always create a random palette before assigning it
+		createRandomPalette();
+		setPalette(_randomPalette);
 	}
 };
