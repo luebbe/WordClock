@@ -19,8 +19,8 @@
 #include "HaMqttConfigBuilder.h"
 
 #include "debugutils.h"
-#include "..\include\Secrets.h"
-#include "..\include\Version.h"
+#include "../include/Secrets.h"
+#include "../include/Version.h"
 
 #define FW_NAME "Word Clock"
 #define FW_MODEL FW_NAME
@@ -48,9 +48,9 @@
 // The LEDs will reach maximum brightness at this lux level and above.
 #define DAYLIGHT_LUX 2500
 
-#define SEND_STATS_INTERVAL 60 * 1000UL         // Send stats every 60 seconds
-#define SEND_LIGHT_INTERVAL 5 * 1000UL          // Send light level every 5 seconds
-#define CHECK_LIGHT_INTERVAL 50UL               // Check light level 20 times per second
+#define SEND_STATS_INTERVAL 60 * 1000UL // Send stats every 60 seconds
+#define SEND_LIGHT_INTERVAL 5 * 1000UL  // Send light level every 5 seconds
+#define CHECK_LIGHT_INTERVAL 50UL       // Check light level 20 times per second
 
 #define MEDIAN_WND 7 // A median filter window size of seven should be enough to filter out most spikes
 #define MEAN_WND 7   // After filtering the spikes we don't need many samples anymore for the average
@@ -106,11 +106,7 @@ Uptime _uptime;
 Uptime _uptimeMqtt;
 Uptime _uptimeWifi;
 
-#ifdef DEBUG
-#define cBaseTopic "debug"
-#else
 #define cBaseTopic "wordclock"
-#endif
 
 // Status
 #define cIpTopic "$localip"
@@ -132,35 +128,77 @@ Uptime _uptimeWifi;
 #define cBrightness "brightness"
 #define cMode "mode"
 #define cModeOptions "[\"Off\",\"Clock\",\"Rainbow\",\"Borealis\",\"Matrix\",\"Snake\"]"
-#define cLight "light"
+#define cMatrix "matrix"
 #define cPalette "palette"
 #define cPaletteOptions "[\"Rainbow\",\"Lava\",\"Cloud\",\"Ocean\",\"Forest\",\"Party\",\"Heat\",\"Random\"]"
 #define cThreeQuarters "threequarters"
 
-void sendHAConfig(const char *topic, const char *payload)
-{
-  DEBUG_PRINTLN(topic);
-  DEBUG_PRINTLN(payload);
+String _uniqueId;
+String _deviceId;
+// MQTT topics
+String _baseTopic;
+String _availabilityTopic;
+String _setMatrixTopic;
+String _setModeTopic;
+String _setPaletteTopic;
+String _setThreeQuartersTopic;
 
-  mqttClient.publish(topic, 1, true, payload);
+void prepareMqttTopics()
+{
+  const uint8_t MAX_MAC_LENGTH = 6;
+  const uint8_t MAC_STRING_LENGTH = (MAX_MAC_LENGTH * 2) + 1;
+  uint8_t mac[MAX_MAC_LENGTH];
+  char macStr[MAC_STRING_LENGTH];
+
+  WiFi.macAddress(mac);
+  snprintf(macStr, MAC_STRING_LENGTH, "%02x%02x%02x%02x%02x%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
+  // use the full MAC address as unique ID
+  _uniqueId = String(macStr);
+  // use the last 3 bytes of the MAC address as short device ID
+  _deviceId = _uniqueId.substring(6);
+
+  _baseTopic = cBaseTopic + String("/") + _deviceId;
+  _availabilityTopic = _baseTopic + String("/") + cAvailabilityTopic;
+  _setMatrixTopic = _baseTopic + String("/") + cMatrix + "/set";
+  _setModeTopic = _baseTopic + String("/") + cMode + "/set";
+  _setPaletteTopic = _baseTopic + String("/") + cPalette + "/set";
+  _setThreeQuartersTopic = _baseTopic + String("/") + cThreeQuarters + "/set";
+}
+
+void sendToMqtt(String topic, String payload)
+{
+  DEBUG_PRINTF("%s->%s\r\n", topic.c_str(), payload.c_str());
+
+  mqttClient.publish(topic.c_str(), 1, true, payload.c_str());
+}
+
+void sendWithPrefix(String subtopic, String payload)
+{
+  const uint8_t MAX_MQTT_TOPIC_LENGTH = 128;
+  char topic[MAX_MQTT_TOPIC_LENGTH];
+
+  snprintf(topic, MAX_MQTT_TOPIC_LENGTH, "%s/%s", _baseTopic.c_str(), subtopic.c_str());
+
+  DEBUG_PRINTF("%s->%s\r\n", topic, payload.c_str());
+
+  mqttClient.publish(topic, 1, true, payload.c_str());
+}
+
+void subscribeToMqtt(String topic)
+{
+  DEBUG_PRINTLN(F("Subscribing to MQTT topic:"));
+  DEBUG_PRINTLN(topic);
+
+  mqttClient.subscribe(topic.c_str(), 1);
 }
 
 void createAutoDiscovery()
 {
-  const uint8_t MAX_MAC_LENGTH = 6;
-  const uint8_t MAC_STRING_LENGTH = (MAX_MAC_LENGTH * 2) + 1;
-
-  uint8_t mac[MAX_MAC_LENGTH];
-  char uniqueId[MAC_STRING_LENGTH];
-
-  WiFi.macAddress(mac);
-  snprintf(uniqueId, MAC_STRING_LENGTH, "%02x%02x%02x%02x%02x%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-
   DeviceConfigBuilder *haConfig;
 
-  haConfig = new DeviceConfigBuilder(uniqueId, FW_NAME, FW_VERSION, FW_MANUFACTURER, FW_MODEL);
-  haConfig->setSendCallback(sendHAConfig)
-      .setDeviceTopic(cBaseTopic);
+  haConfig = new DeviceConfigBuilder(_uniqueId, FW_NAME, FW_VERSION, FW_MANUFACTURER, FW_MODEL);
+  haConfig->setDeviceTopic(cBaseTopic).setSendCallback(sendToMqtt);
 
   // Stats sensors
   // Free memory
@@ -179,7 +217,7 @@ void createAutoDiscovery()
   haConfig->createSensor("Brightness level", cBrightness, cBrightness, "mdi:brightness-auto", "", "");
 
   // Display On/Off
-  haConfig->createLight("Matrix", cLight, cLight, "");
+  haConfig->createLight("Matrix", cMatrix, cMatrix, "mdi:clock-digital");
 
   // Display mode
   haConfig->createSelect("Display mode", cMode, cMode, "mdi:auto-fix", cModeOptions);
@@ -197,27 +235,27 @@ void sendBrightness()
 {
   DEBUG_PRINTLN(F("Sending State"));
 
-  mqttClient.publish(cBaseTopic "/" cBrightness, 1, true, String(FastLED.getBrightness()).c_str());
-  mqttClient.publish(cBaseTopic "/" cLightlevel, 1, true, String(_lux).c_str());
+  sendWithPrefix(cBrightness, String(FastLED.getBrightness()).c_str());
+  sendWithPrefix(cLightlevel, String(_lux).c_str());
 }
 
 void sendStats()
 {
   DEBUG_PRINTLN(F("Sending Statistics"));
 
-  mqttClient.publish(cBaseTopic "/" cStatsTopic "/" cSignal, 1, true, String(WiFi.RSSI()).c_str());
-  mqttClient.publish(cBaseTopic "/" cStatsTopic "/" cFreeHeap, 1, true, String(ESP.getFreeHeap()).c_str());
+  sendWithPrefix(cStatsTopic "/" cSignal, String(WiFi.RSSI()).c_str());
+  sendWithPrefix(cStatsTopic "/" cFreeHeap, String(ESP.getFreeHeap()).c_str());
 
   _uptime.update();
   _uptimeWifi.update();
   _uptimeMqtt.update();
   char statusStr[20 + 1];
   itoa(_uptime.getSeconds(), statusStr, 10);
-  mqttClient.publish(cBaseTopic "/" cStatsTopic "/" cUptime, 1, true, statusStr);
+  sendWithPrefix(cStatsTopic "/" cUptime, statusStr);
   itoa(_uptimeWifi.getSeconds(), statusStr, 10);
-  mqttClient.publish(cBaseTopic "/" cStatsTopic "/" cUptimeWifi, 1, true, statusStr);
+  sendWithPrefix(cStatsTopic "/" cUptimeWifi, statusStr);
   itoa(_uptimeMqtt.getSeconds(), statusStr, 10);
-  mqttClient.publish(cBaseTopic "/" cStatsTopic "/" cUptimeMqtt, 1, true, statusStr);
+  sendWithPrefix(cStatsTopic "/" cUptimeMqtt, statusStr);
 }
 
 void setMode(String mode)
@@ -252,8 +290,8 @@ void setMode(String mode)
     _currMode = mode;
     _modeChanged = true;
 
-    mqttClient.publish(cBaseTopic "/" cLight, 1, true, _currLight.c_str());
-    mqttClient.publish(cBaseTopic "/" cMode, 1, true, _currMode.c_str());
+    sendWithPrefix(cMatrix, _currLight.c_str());
+    sendWithPrefix(cMode, _currMode.c_str());
   }
 }
 
@@ -285,7 +323,7 @@ void setPalette(String palette)
 
     _currPalette = palette;
 
-    mqttClient.publish(cBaseTopic "/" cPalette, 1, true, _currPalette.c_str());
+    sendWithPrefix(cPalette, _currPalette.c_str());
   }
 }
 
@@ -305,7 +343,7 @@ void setLight(String cmd)
 void setThreeQuarters(bool on)
 {
   wordClock.setUseThreeQuarters(on);
-  mqttClient.publish(cBaseTopic "/" cThreeQuarters, 1, true, on ? "On" : "Off");
+  sendWithPrefix(cThreeQuarters, on ? "On" : "Off");
 }
 
 // MQTT connection and event handling
@@ -326,18 +364,18 @@ void onMqttConnect(bool sessionPresent)
 
   _uptimeMqtt.reset();
 
-  mqttClient.subscribe(cBaseTopic "/" cMode "/set", 1);
-  mqttClient.subscribe(cBaseTopic "/" cLight "/set", 1);
-  mqttClient.subscribe(cBaseTopic "/" cPalette "/set", 1);
-  mqttClient.subscribe(cBaseTopic "/" cThreeQuarters "/set", 1);
+  subscribeToMqtt(_setMatrixTopic);
+  subscribeToMqtt(_setModeTopic);
+  subscribeToMqtt(_setPaletteTopic);
+  subscribeToMqtt(_setThreeQuartersTopic);
 
-  mqttClient.publish(cBaseTopic "/" cFirmwareName, 1, true, FW_NAME);
-  mqttClient.publish(cBaseTopic "/" cFirmwareVersion, 1, true, FW_VERSION);
-  mqttClient.publish(cBaseTopic "/" cFirmwareDate, 1, true, FW_DATE);
+  sendWithPrefix(cFirmwareName, FW_NAME);
+  sendWithPrefix(cFirmwareVersion, FW_VERSION);
+  sendWithPrefix(cFirmwareDate, FW_DATE);
 
-  mqttClient.publish(cBaseTopic "/" cIpTopic, 1, true, WiFi.localIP().toString().c_str());
-  mqttClient.publish(cBaseTopic "/" cMacTopic, 1, true, WiFi.macAddress().c_str());
-  mqttClient.publish(cBaseTopic "/" cAvailabilityTopic, 1, true, cPlAvailable);
+  sendWithPrefix(cIpTopic, WiFi.localIP().toString().c_str());
+  sendWithPrefix(cMacTopic, WiFi.macAddress().c_str());
+  sendWithPrefix(cAvailabilityTopic, cPlAvailable);
 
   createAutoDiscovery();
 
@@ -369,15 +407,17 @@ void onMqttMessage(const espMqttClientTypes::MessageProperties &properties, cons
     char *strval = new char[len + 1];
     memcpy(strval, payload, len);
     strval[len] = 0;
-    DEBUG_PRINTF("Message %s: %s\r\n", topic, strval);
 
-    if (strcmp(topic, cBaseTopic "/" cLight "/set") == 0)
+    DEBUG_PRINTF("Message %s: %s\r\n", topic, strval);
+    DEBUG_PRINTF("MATRIX %s\r\n", _setMatrixTopic.c_str());
+
+    if (_setMatrixTopic.compareTo(topic) == 0)
       setLight(strval);
-    else if (strcmp(topic, cBaseTopic "/" cMode "/set") == 0)
+    else if (_setModeTopic.compareTo(topic) == 0)
       setMode(strval);
-    else if (strcmp(topic, cBaseTopic "/" cPalette "/set") == 0)
+    else if (_setPaletteTopic.compareTo(topic) == 0)
       setPalette(strval);
-    else if (strcmp(topic, cBaseTopic "/" cThreeQuarters "/set") == 0)
+    else if (_setThreeQuartersTopic.compareTo(topic) == 0)
       setThreeQuarters((strcmp(strval, "On") == 0) || (strcmp(strval, "on") == 0) || (strcmp(strval, "1") == 0));
 
     delete[] strval;
@@ -498,6 +538,8 @@ void setup()
   Serial.begin(SERIAL_SPEED);
   DEBUG_PRINTF("\r\n\r\n%s %s\r\n\r\n", FW_NAME, FW_VERSION);
 
+  prepareMqttTopics();
+
   Wire.begin(PIN_SDA, PIN_SCL);
 
   _lightMeterOK = lightMeter.begin(BH1750::CONTINUOUS_LOW_RES_MODE); // Run in Low-Res mode to allow faster sampling
@@ -522,7 +564,8 @@ void setup()
   mqttClient.onDisconnect(onMqttDisconnect);
   mqttClient.onMessage(onMqttMessage);
   mqttClient.setServer(MQTT_HOST, MQTT_PORT);
-  mqttClient.setWill(cBaseTopic "/" cAvailabilityTopic, 1, true, cPlNotAvailable);
+
+  mqttClient.setWill(_availabilityTopic.c_str(), 1, true, cPlNotAvailable);
 
   _uptime.reset();
   connectToWifi();
