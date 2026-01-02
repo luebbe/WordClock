@@ -10,7 +10,8 @@
 StatusAnimation::StatusAnimation(const ILedMatrix *ledMatrix, CRGB *leds, uint16_t count)
     : LedEffect(leds, count),
       _ledMatrix(ledMatrix),
-      _status(SETUP)
+      _status(SETUP),
+      _lastUpdate(0)
 {
   _minuteLEDs = (_leds + _ledMatrix->getCount()); // Pointer to the start of the buffer for the minute LEDs
 }
