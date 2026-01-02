@@ -409,7 +409,6 @@ void onMqttMessage(const espMqttClientTypes::MessageProperties &properties, cons
     strval[len] = 0;
 
     DEBUG_PRINTF("Message %s: %s\r\n", topic, strval);
-    DEBUG_PRINTF("MATRIX %s\r\n", _setMatrixTopic.c_str());
 
     if (_setMatrixTopic.compareTo(topic) == 0)
       setLight(strval);
